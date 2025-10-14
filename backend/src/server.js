@@ -1,9 +1,13 @@
 import express from 'express';
 import dotenv from 'dotenv';
+import { connectDB } from './config/db.js';  // Import the connectDB function
 
 dotenv.config();  // Load environment variables from .env
 
 const app = express();
+
+// Connect to MongoDB
+connectDB(); // Call the function to connect to MongoDB
 
 // Middleware to parse incoming JSON requests
 app.use(express.json());
