@@ -1,45 +1,60 @@
 import express from 'express';
 import dotenv from 'dotenv';
-import { connectDB } from './config/db.js';  // Import the connectDB function
+import cors from 'cors';
+import { connectDB } from './config/db.js';
+import authRoutes from './routes/authRoutes.js';
+import walletRoutes from './routes/walletRoutes.js';
+import transactionRoutes from './routes/transactionRoutes.js';
+import dashboardRoutes from './routes/dashboardRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
+import { initAuth } from './controllers/authController.js';
+import { initTransactions } from './controllers/transactionController.js';
 
-dotenv.config();  // Load environment variables from .env
+dotenv.config();
 
 const app = express();
 
-// Connect to MongoDB
-connectDB(); // Call the function to connect to MongoDB
-
-// Middleware to parse incoming JSON requests
+// Middleware
+app.use(cors());
 app.use(express.json());
 
-// Basic route for testing the server
+// Basic health check route
 app.get('/', (req, res) => {
-  console.log('GET request received at /');
-  res.send('Backend is working!');
+  res.send('FXWallet backend is running');
 });
 
-// Test POST route to check if server works
-app.post('/test', (req, res) => {
-  const { message } = req.body;
-  console.log('POST request received with message:', message);
-  res.json({ response: `Received: ${message}` });
-});
+// API routes
+app.use('/api/auth', authRoutes);
+app.use('/api/wallets', walletRoutes);
+app.use('/api/transactions', transactionRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/notifications', notificationRoutes);
 
-// Set the port (can be dynamic via environment variables)
 const PORT = process.env.PORT || 5001;
 
-// Start the server
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+const startServer = async () => {
+  await connectDB();
+  await initAuth();
+  await initTransactions();
+
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+  });
+};
+
+startServer().catch((err) => {
+  console.error('Failed to start server:', err);
+  process.exit(1);
 });
 
-// Handle uncaught exceptions and unhandled rejections
 process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception:', err);
-  process.exit(1); // Exit the process to avoid any further issues
+  process.exit(1);
 });
 
 process.on('unhandledRejection', (err) => {
   console.error('Unhandled Rejection:', err);
-  process.exit(1); // Exit the process to avoid any further issues
+  process.exit(1);
 });
