@@ -78,6 +78,7 @@ export const register = async (req, res) => {
         fullName: user.full_name,
         baseCurrency: user.base_currency,
         timezone: user.timezone,
+        role: user.role || 'user',
       },
     });
   } catch (err) {
@@ -114,6 +115,7 @@ export const login = async (req, res) => {
         fullName: user.full_name,
         baseCurrency: user.base_currency,
         timezone: user.timezone,
+        role: user.role,
       },
     });
   } catch (err) {
@@ -135,11 +137,16 @@ export const getProfile = async (req, res) => {
     }
 
     return res.json({
+      user: {
       id: user.id,
       email: user.email,
-      fullName: user.full_name,
-      baseCurrency: user.base_currency,
+        full_name: user.full_name,
+        base_currency: user.base_currency,
       timezone: user.timezone,
+        role: user.role,
+        is_active: user.is_active,
+        is_verified: user.is_verified,
+      },
     });
   } catch (err) {
     console.error('Get profile error:', err);

@@ -36,3 +36,5 @@ ON DUPLICATE KEY UPDATE
 SELECT id, email, role, is_active FROM users WHERE email = 'admin@admin.com';
 
 
+
+
