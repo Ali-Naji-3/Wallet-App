@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { fetchProfile } from '../api';
 
 function Sidebar({ isOpen, onToggle }) {
   const location = useLocation();
@@ -7,6 +8,19 @@ function Sidebar({ isOpen, onToggle }) {
     transactions: false,
     admin: false,
   });
+  const [userProfile, setUserProfile] = useState(null);
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const profile = await fetchProfile();
+        setUserProfile(profile);
+      } catch (err) {
+        console.error('Failed to load profile:', err);
+      }
+    };
+    loadProfile();
+  }, []);
 
   const toggleSection = (section) => {
     setExpandedSections((prev) => ({
@@ -76,15 +90,6 @@ function Sidebar({ isOpen, onToggle }) {
         <div
           className="sidebar-overlay"
           onClick={onToggle}
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.5)',
-            zIndex: 998,
-          }}
         />
       )}
 
@@ -99,7 +104,7 @@ function Sidebar({ isOpen, onToggle }) {
           width: isOpen ? '280px' : '70px',
           background: 'linear-gradient(180deg, #1e293b 0%, #0f172a 100%)',
           color: 'white',
-          transition: 'width 0.3s ease',
+          transition: 'width 0.3s ease, transform 0.3s ease',
           zIndex: 999,
           overflowY: 'auto',
           boxShadow: '2px 0 10px rgba(0, 0, 0, 0.1)',
@@ -112,7 +117,7 @@ function Sidebar({ isOpen, onToggle }) {
             borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: isOpen ? 'space-between' : 'center',
+            justifyContent: isOpen ? 'flex-start' : 'center',
           }}
         >
           {isOpen && (
@@ -120,22 +125,64 @@ function Sidebar({ isOpen, onToggle }) {
               FXWallet
             </h2>
           )}
-          <button
-            onClick={onToggle}
-            style={{
-              background: 'rgba(255, 255, 255, 0.1)',
-              border: 'none',
-              color: 'white',
-              padding: '0.5rem',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '1.2rem',
-            }}
-            title={isOpen ? 'Collapse' : 'Expand'}
-          >
-            {isOpen ? '◀' : '▶'}
-          </button>
         </div>
+
+        {/* User Profile Section */}
+        {userProfile && (
+          <div
+            style={{
+              padding: '1rem',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+            }}
+          >
+            <div
+              style={{
+                width: isOpen ? '40px' : '32px',
+                height: isOpen ? '40px' : '32px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #60a5fa, #3b82f6)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: isOpen ? '1.2rem' : '1rem',
+                flexShrink: 0,
+              }}
+            >
+              👤
+            </div>
+            {isOpen && (
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    fontSize: '0.9rem',
+                    fontWeight: '600',
+                    color: 'white',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {userProfile.fullName || userProfile.email?.split('@')[0] || 'User'}
+                </div>
+                <div
+                  style={{
+                    fontSize: '0.75rem',
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    marginTop: '0.25rem',
+                  }}
+                >
+                  {userProfile.email || ''}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Navigation Menu */}
         <nav style={{ padding: '1rem 0' }}>
@@ -246,7 +293,7 @@ function Sidebar({ isOpen, onToggle }) {
               bottom: 0,
               left: 0,
               right: 0,
-              padding: '1rem',
+              padding: '0.5rem 1rem',
               borderTop: '1px solid rgba(255, 255, 255, 0.1)',
               fontSize: '0.75rem',
               color: 'rgba(255, 255, 255, 0.6)',

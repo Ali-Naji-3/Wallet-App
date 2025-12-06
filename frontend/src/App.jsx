@@ -208,6 +208,13 @@ function ExchangePage() {
 
   return (
     <div className="page-container" style={{ display: 'flex', minHeight: '100vh' }}>
+      <button
+        className="mobile-menu-button"
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        aria-label="Toggle menu"
+      >
+        ☰
+      </button>
       <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
       <div style={{ 
         position: 'fixed',
@@ -351,11 +358,21 @@ function TransferPage() {
   if (loading) {
     return (
       <div className="page-container" style={{ display: 'flex', minHeight: '100vh' }}>
+        <button
+          className="mobile-menu-button"
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          aria-label="Toggle menu"
+        >
+          ☰
+        </button>
         <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
         <div style={{ 
-          flex: 1, 
-          marginLeft: sidebarOpen ? '280px' : '70px',
-          transition: 'margin-left 0.3s ease',
+          position: 'fixed',
+          left: sidebarOpen ? '280px' : '70px',
+          right: 0,
+          top: 0,
+          bottom: 0,
+          overflowY: 'auto',
           padding: '1rem',
         }}>
           Loading...
@@ -366,6 +383,13 @@ function TransferPage() {
 
   return (
     <div className="page-container" style={{ display: 'flex', minHeight: '100vh' }}>
+      <button
+        className="mobile-menu-button"
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        aria-label="Toggle menu"
+      >
+        ☰
+      </button>
       <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
       <div style={{ 
         position: 'fixed',
@@ -628,11 +652,21 @@ function DashboardPage() {
   if (loading && !profile) {
     return (
       <div className="page-container" style={{ display: 'flex', minHeight: '100vh' }}>
+        <button
+          className="mobile-menu-button"
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          aria-label="Toggle menu"
+        >
+          ☰
+        </button>
         <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
         <div style={{ 
-          flex: 1, 
-          marginLeft: sidebarOpen ? '280px' : '70px',
-          transition: 'margin-left 0.3s ease',
+          position: 'fixed',
+          left: sidebarOpen ? '280px' : '70px',
+          right: 0,
+          top: 0,
+          bottom: 0,
+          overflowY: 'auto',
           padding: '1rem',
         }}>
           Loading dashboard...
@@ -644,11 +678,21 @@ function DashboardPage() {
   if (error) {
     return (
       <div className="page-container" style={{ display: 'flex', minHeight: '100vh' }}>
+        <button
+          className="mobile-menu-button"
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          aria-label="Toggle menu"
+        >
+          ☰
+        </button>
         <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
         <div style={{ 
-          flex: 1, 
-          marginLeft: sidebarOpen ? '280px' : '70px',
-          transition: 'margin-left 0.3s ease',
+          position: 'fixed',
+          left: sidebarOpen ? '280px' : '70px',
+          right: 0,
+          top: 0,
+          bottom: 0,
+          overflowY: 'auto',
           padding: '1rem',
         }}>
           Error: {error}
@@ -664,6 +708,13 @@ function DashboardPage() {
 
   return (
     <div className="page-container" style={{ display: 'flex', minHeight: '100vh' }}>
+      <button
+        className="mobile-menu-button"
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        aria-label="Toggle menu"
+      >
+        ☰
+      </button>
       <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
       <div style={{ 
         position: 'fixed',
@@ -928,11 +979,21 @@ function AdminPage() {
   if (loading) {
     return (
       <div className="page-container" style={{ display: 'flex', minHeight: '100vh' }}>
+        <button
+          className="mobile-menu-button"
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          aria-label="Toggle menu"
+        >
+          ☰
+        </button>
         <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
         <div style={{ 
-          flex: 1, 
-          marginLeft: sidebarOpen ? '280px' : '70px',
-          transition: 'margin-left 0.3s ease',
+          position: 'fixed',
+          left: sidebarOpen ? '280px' : '70px',
+          right: 0,
+          top: 0,
+          bottom: 0,
+          overflowY: 'auto',
           padding: '1rem',
         }}>
           Loading admin panel...
@@ -944,11 +1005,21 @@ function AdminPage() {
   if (error) {
     return (
       <div className="page-container" style={{ display: 'flex', minHeight: '100vh' }}>
+        <button
+          className="mobile-menu-button"
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          aria-label="Toggle menu"
+        >
+          ☰
+        </button>
         <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
         <div style={{ 
-          flex: 1, 
-          marginLeft: sidebarOpen ? '280px' : '70px',
-          transition: 'margin-left 0.3s ease',
+          position: 'fixed',
+          left: sidebarOpen ? '280px' : '70px',
+          right: 0,
+          top: 0,
+          bottom: 0,
+          overflowY: 'auto',
           padding: '1rem',
         }}>
           <div className="error-text">Admin access denied or error: {error}</div>
@@ -960,6 +1031,13 @@ function AdminPage() {
 
   return (
     <div className="page-container" style={{ display: 'flex', minHeight: '100vh' }}>
+      <button
+        className="mobile-menu-button"
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        aria-label="Toggle menu"
+      >
+        ☰
+      </button>
       <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
       <div style={{ 
         position: 'fixed',
