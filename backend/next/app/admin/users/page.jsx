@@ -96,14 +96,14 @@ export default function UsersPage() {
     <div className="p-6 space-y-6">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm">
-        <Link href="/admin/users" className="text-gray-400 hover:text-white">Users</Link>
-        <ChevronRight className="h-4 w-4 text-gray-600" />
-        <span className="text-gray-300">List</span>
+        <Link href="/admin/users" className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white">Users</Link>
+        <ChevronRight className="h-4 w-4 text-gray-400 dark:text-gray-600" />
+        <span className="text-gray-600 dark:text-gray-300">List</span>
       </div>
 
       {/* Page Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">Users</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Users</h1>
         <Link href="/admin/users/create">
           <Button className="bg-amber-500 hover:bg-amber-600 text-gray-900 font-medium">
             <Plus className="h-4 w-4 mr-2" />
@@ -113,31 +113,31 @@ export default function UsersPage() {
       </div>
 
       {/* Table Card */}
-      <Card className="bg-gray-900 border-gray-800">
+      <Card className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 shadow-xl">
         <CardContent className="p-0">
           {/* Search and Filters */}
-          <div className="flex items-center justify-between p-4 border-b border-gray-800">
+          <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800">
             <div className="flex items-center gap-3">
               {/* Search */}
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
                 <input
                   type="text"
                   placeholder="Search"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 pr-4 py-2 w-64 rounded-lg border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm"
+                  className="pl-10 pr-4 py-2 w-64 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm"
                 />
               </div>
             </div>
 
             <div className="flex items-center gap-2">
               {/* Filter */}
-              <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white hover:bg-gray-800">
+              <Button variant="ghost" size="sm" className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800">
                 <Filter className="h-4 w-4" />
               </Button>
               {/* Toggle View */}
-              <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white hover:bg-gray-800">
+              <Button variant="ghost" size="sm" className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800">
                 <LayoutGrid className="h-4 w-4" />
               </Button>
             </div>
@@ -147,23 +147,23 @@ export default function UsersPage() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-gray-800">
+                <tr className="border-b border-gray-200 dark:border-gray-800">
                   <th className="p-4 w-12">
                     <Checkbox
                       checked={selectedUsers.length === usersData.length}
                       onCheckedChange={toggleSelectAll}
-                      className="border-gray-600"
+                      className="border-gray-400 dark:border-gray-600"
                     />
                   </th>
                   {columns.map((col) => (
                     <th
                       key={col.key}
-                      className="p-4 text-left text-sm font-medium text-gray-400"
+                      className="p-4 text-left text-sm font-medium text-gray-600 dark:text-gray-400"
                     >
                       {col.sortable ? (
                         <button
                           onClick={() => handleSort(col.key)}
-                          className="flex items-center gap-1 hover:text-white transition-colors"
+                          className="flex items-center gap-1 hover:text-gray-900 dark:hover:text-white transition-colors"
                         >
                           {col.label}
                           {sortColumn === col.key ? (
@@ -188,23 +188,23 @@ export default function UsersPage() {
                 {usersData.map((user) => (
                   <tr
                     key={user.id}
-                    className="border-b border-gray-800 hover:bg-gray-800/50 transition-colors"
+                    className="border-b border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
                   >
                     <td className="p-4">
                       <Checkbox
                         checked={selectedUsers.includes(user.id)}
                         onCheckedChange={() => toggleSelect(user.id)}
-                        className="border-gray-600"
+                        className="border-gray-400 dark:border-gray-600"
                       />
                     </td>
-                    <td className="p-4 text-sm text-white font-medium">{user.name}</td>
-                    <td className="p-4 text-sm text-gray-300">{user.email}</td>
+                    <td className="p-4 text-sm text-gray-900 dark:text-white font-medium">{user.name}</td>
+                    <td className="p-4 text-sm text-gray-600 dark:text-gray-300">{user.email}</td>
                     <td className="p-4">
                       <Badge
                         className={
                           user.role === 'admin'
-                            ? 'bg-pink-500/20 text-pink-400 border-pink-500/30 hover:bg-pink-500/30'
-                            : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/30'
+                            ? 'bg-pink-500/20 text-pink-600 dark:text-pink-400 border-pink-500/30 hover:bg-pink-500/30'
+                            : 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/30'
                         }
                       >
                         {user.role === 'admin' ? (
@@ -216,37 +216,37 @@ export default function UsersPage() {
                         </Badge>
                     </td>
                     <td className="p-4">
-                      <span className="inline-flex items-center justify-center min-w-[24px] h-6 px-2 rounded-full bg-blue-500/20 text-blue-400 text-xs font-medium">
+                      <span className="inline-flex items-center justify-center min-w-[24px] h-6 px-2 rounded-full bg-blue-500/20 text-blue-600 dark:text-blue-400 text-xs font-medium">
                         {user.orders}
                       </span>
                     </td>
                     <td className="p-4">
-                      <span className="inline-flex items-center justify-center min-w-[24px] h-6 px-2 rounded-full bg-amber-500/20 text-amber-400 text-xs font-medium">
+                      <span className="inline-flex items-center justify-center min-w-[24px] h-6 px-2 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-medium">
                         {user.reviews}
                       </span>
                     </td>
                     <td className="p-4">
-                      <span className="inline-flex items-center justify-center min-w-[24px] h-6 px-2 rounded-full bg-purple-500/20 text-purple-400 text-xs font-medium">
+                      <span className="inline-flex items-center justify-center min-w-[24px] h-6 px-2 rounded-full bg-purple-500/20 text-purple-600 dark:text-purple-400 text-xs font-medium">
                         {user.apiTokens}
                       </span>
                     </td>
-                    <td className="p-4 text-sm text-gray-400">{formatDate(user.joined)}</td>
+                    <td className="p-4 text-sm text-gray-500 dark:text-gray-400">{formatDate(user.joined)}</td>
                     <td className="p-4">
                       <div className="flex items-center gap-1">
                               <Link href={`/admin/users/${user.id}`}>
-                          <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white h-8 px-2">
+                          <Button variant="ghost" size="sm" className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white h-8 px-2">
                             <Eye className="h-4 w-4 mr-1" />
                                 View
                           </Button>
                               </Link>
                               <Link href={`/admin/users/${user.id}/edit`}>
-                          <Button variant="ghost" size="sm" className="text-gray-400 hover:text-amber-400 h-8 px-2">
+                          <Button variant="ghost" size="sm" className="text-gray-600 dark:text-gray-400 hover:text-amber-600 dark:hover:text-amber-400 h-8 px-2">
                             <Pencil className="h-4 w-4 mr-1" />
                                 Edit
                           </Button>
                               </Link>
                         {user.role !== 'admin' && (
-                          <Button variant="ghost" size="sm" className="text-gray-400 hover:text-red-400 h-8 px-2">
+                          <Button variant="ghost" size="sm" className="text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 h-8 px-2">
                             <Trash2 className="h-4 w-4 mr-1" />
                             Delete
                           </Button>
@@ -260,26 +260,26 @@ export default function UsersPage() {
           </div>
 
           {/* Pagination */}
-          <div className="flex items-center justify-between p-4 border-t border-gray-800">
-            <p className="text-sm text-gray-400">
+          <div className="flex items-center justify-between p-4 border-t border-gray-200 dark:border-gray-800">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
               Showing 1 to {usersData.length} of {usersData.length} results
             </p>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-400">Per page</span>
+                <span className="text-sm text-gray-600 dark:text-gray-400">Per page</span>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="bg-gray-800 border-gray-700 text-white hover:bg-gray-700">
+                    <Button variant="outline" size="sm" className="bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700">
                       {perPage}
                       <ChevronDown className="h-4 w-4 ml-2" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent className="bg-gray-900 border-gray-800">
+                  <DropdownMenuContent className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
                     {[10, 25, 50, 100].map((num) => (
                             <DropdownMenuItem
                         key={num}
                         onClick={() => setPerPage(num)}
-                        className="text-gray-300 hover:text-white hover:bg-gray-800"
+                        className="text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
                             >
                         {num}
                             </DropdownMenuItem>
@@ -288,10 +288,10 @@ export default function UsersPage() {
                         </DropdownMenu>
                 </div>
               <div className="flex items-center gap-1">
-                <Button variant="outline" size="sm" disabled className="bg-gray-800 border-gray-700 text-gray-500">
+                <Button variant="outline" size="sm" disabled className="bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-400 dark:text-gray-500">
                   <ChevronLeft className="h-4 w-4" />
                   </Button>
-                <Button variant="outline" size="sm" disabled className="bg-gray-800 border-gray-700 text-gray-500">
+                <Button variant="outline" size="sm" disabled className="bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-400 dark:text-gray-500">
                   <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>

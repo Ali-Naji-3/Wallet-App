@@ -35,10 +35,10 @@ const getTypeIcon = (type) => {
 
 const getStatusColor = (status) => {
   switch (status) {
-    case 'completed': return 'bg-emerald-500/20 text-emerald-400';
-    case 'pending': return 'bg-amber-500/20 text-amber-400';
-    case 'failed': return 'bg-red-500/20 text-red-400';
-    default: return 'bg-gray-500/20 text-gray-400';
+    case 'completed': return 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20';
+    case 'pending': return 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20';
+    case 'failed': return 'bg-red-500/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/20';
+    default: return 'bg-gray-500/20 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-500/20';
   }
 };
 
@@ -47,15 +47,15 @@ export default function TransactionsPage() {
     <div className="p-6 space-y-6">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm">
-        <Link href="/admin/transactions" className="text-gray-400 hover:text-white">Transactions</Link>
-        <ChevronRight className="h-4 w-4 text-gray-600" />
-        <span className="text-gray-300">All</span>
+        <Link href="/admin/transactions" className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white">Transactions</Link>
+        <ChevronRight className="h-4 w-4 text-gray-400 dark:text-gray-600" />
+        <span className="text-gray-600 dark:text-gray-300">All</span>
       </div>
 
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">All Transactions</h1>
-        <Button variant="outline" className="border-gray-700 text-gray-300 hover:bg-gray-800">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">All Transactions</h1>
+        <Button variant="outline" className="border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800">
           <Download className="h-4 w-4 mr-2" />
           Export
         </Button>
@@ -63,45 +63,45 @@ export default function TransactionsPage() {
 
       {/* Stats */}
       <div className="grid gap-4 md:grid-cols-4">
-        <Card className="bg-gray-900 border-gray-800">
+        <Card className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 shadow-xl">
           <CardContent className="p-4">
-            <p className="text-gray-400 text-sm">Total Transactions</p>
-            <p className="text-2xl font-bold text-white mt-1">12,456</p>
+            <p className="text-gray-600 dark:text-gray-400 text-sm">Total Transactions</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">12,456</p>
           </CardContent>
         </Card>
-        <Card className="bg-gray-900 border-gray-800">
+        <Card className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 shadow-xl">
           <CardContent className="p-4">
-            <p className="text-gray-400 text-sm">Completed</p>
-            <p className="text-2xl font-bold text-emerald-400 mt-1">11,890</p>
+            <p className="text-gray-600 dark:text-gray-400 text-sm">Completed</p>
+            <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">11,890</p>
           </CardContent>
         </Card>
-        <Card className="bg-gray-900 border-gray-800">
+        <Card className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 shadow-xl">
           <CardContent className="p-4">
-            <p className="text-gray-400 text-sm">Pending</p>
-            <p className="text-2xl font-bold text-amber-400 mt-1">542</p>
+            <p className="text-gray-600 dark:text-gray-400 text-sm">Pending</p>
+            <p className="text-2xl font-bold text-amber-600 dark:text-amber-400 mt-1">542</p>
           </CardContent>
         </Card>
-        <Card className="bg-gray-900 border-gray-800">
+        <Card className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 shadow-xl">
           <CardContent className="p-4">
-            <p className="text-gray-400 text-sm">Failed</p>
-            <p className="text-2xl font-bold text-red-400 mt-1">24</p>
+            <p className="text-gray-600 dark:text-gray-400 text-sm">Failed</p>
+            <p className="text-2xl font-bold text-red-600 dark:text-red-400 mt-1">24</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Table */}
-      <Card className="bg-gray-900 border-gray-800">
+      <Card className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 shadow-xl">
         <CardContent className="p-0">
-          <div className="flex items-center justify-between p-4 border-b border-gray-800">
+          <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
               <input
                 type="text"
                 placeholder="Search transactions..."
-                className="pl-10 pr-4 py-2 w-64 rounded-lg border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm"
+                className="pl-10 pr-4 py-2 w-64 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm"
               />
             </div>
-            <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
+            <Button variant="ghost" size="sm" className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800">
               <Filter className="h-4 w-4 mr-2" />
               Filter
             </Button>
@@ -110,38 +110,38 @@ export default function TransactionsPage() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-gray-800">
-                  <th className="p-4 text-left text-sm font-medium text-gray-400">ID</th>
-                  <th className="p-4 text-left text-sm font-medium text-gray-400">Type</th>
-                  <th className="p-4 text-left text-sm font-medium text-gray-400">From</th>
-                  <th className="p-4 text-left text-sm font-medium text-gray-400">To</th>
-                  <th className="p-4 text-left text-sm font-medium text-gray-400">Amount</th>
-                  <th className="p-4 text-left text-sm font-medium text-gray-400">Status</th>
-                  <th className="p-4 text-left text-sm font-medium text-gray-400">Date</th>
+                <tr className="border-b border-gray-200 dark:border-gray-800">
+                  <th className="p-4 text-left text-sm font-medium text-gray-600 dark:text-gray-400">ID</th>
+                  <th className="p-4 text-left text-sm font-medium text-gray-600 dark:text-gray-400">Type</th>
+                  <th className="p-4 text-left text-sm font-medium text-gray-600 dark:text-gray-400">From</th>
+                  <th className="p-4 text-left text-sm font-medium text-gray-600 dark:text-gray-400">To</th>
+                  <th className="p-4 text-left text-sm font-medium text-gray-600 dark:text-gray-400">Amount</th>
+                  <th className="p-4 text-left text-sm font-medium text-gray-600 dark:text-gray-400">Status</th>
+                  <th className="p-4 text-left text-sm font-medium text-gray-600 dark:text-gray-400">Date</th>
                   <th className="p-4"></th>
                 </tr>
               </thead>
               <tbody>
                 {transactions.map((tx) => (
-                  <tr key={tx.id} className="border-b border-gray-800 hover:bg-gray-800/50">
-                    <td className="p-4 text-white font-mono text-sm">{tx.id}</td>
+                  <tr key={tx.id} className="border-b border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                    <td className="p-4 text-gray-900 dark:text-white font-mono text-sm">{tx.id}</td>
                     <td className="p-4">
-                      <div className="flex items-center gap-2 text-gray-300">
+                      <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
                         {getTypeIcon(tx.type)}
                         <span className="capitalize">{tx.type}</span>
                       </div>
                     </td>
-                    <td className="p-4 text-gray-300">{tx.from}</td>
-                    <td className="p-4 text-gray-300">{tx.to}</td>
-                    <td className="p-4 text-white font-medium">{tx.amount}</td>
+                    <td className="p-4 text-gray-700 dark:text-gray-300">{tx.from}</td>
+                    <td className="p-4 text-gray-700 dark:text-gray-300">{tx.to}</td>
+                    <td className="p-4 text-gray-900 dark:text-white font-medium">{tx.amount}</td>
                     <td className="p-4">
                       <Badge className={getStatusColor(tx.status)}>
                         {tx.status}
                       </Badge>
                     </td>
-                    <td className="p-4 text-gray-400 text-sm">{tx.date}</td>
+                    <td className="p-4 text-gray-500 dark:text-gray-400 text-sm">{tx.date}</td>
                     <td className="p-4">
-                      <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
+                      <Button variant="ghost" size="sm" className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">
                         <Eye className="h-4 w-4" />
                       </Button>
                     </td>

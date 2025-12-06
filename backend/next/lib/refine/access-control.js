@@ -1,25 +1,32 @@
 export const accessControlProvider = {
-  can: async ({ resource, action, params }) => {
-    // Get user role from localStorage or context
-    const token = typeof window !== 'undefined' ? localStorage.getItem('fxwallet_token') : null;
-    
+  can: async ({ resource }) => {
+    // Client-side only
+    if (typeof window === 'undefined') {
+      return { can: false };
+    }
+
+    const token = localStorage.getItem('fxwallet_token');
+    const role = localStorage.getItem('user_role') || 'user';
+
     if (!token) {
       return { can: false };
     }
 
-    // For now, allow all actions for authenticated admin users
-    // In production, implement proper role-based access control
-    
-    // Admin-only resources
+    // Admin-only resources in Refine (admin pages / resources)
     const adminResources = ['users', 'transactions', 'wallets', 'settings', 'kyc', 'audit-logs'];
-    
+
     if (adminResources.includes(resource || '')) {
-      // Check if user is admin (you can decode JWT or check from context)
-      // For now, assume authenticated users accessing admin routes are admins
+      // Only admins can access these resources on the client
+      if (role !== 'admin') {
+        return {
+          can: false,
+          reason: 'Admin role required',
+        };
+      }
       return { can: true };
     }
 
-    // Default: allow
+    // Default: allow for non-admin resources when authenticated
     return { can: true };
   },
 };
