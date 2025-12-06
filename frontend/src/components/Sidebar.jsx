@@ -33,16 +33,10 @@ function Sidebar({ isOpen, onToggle }) {
 
   const menuItems = [
     {
-      title: 'Dashboard',
+      title: 'Wallet',
       icon: '📊',
-      path: '/dashboard',
+      path: '/wallet',
       exact: true,
-    },
-    {
-      title: 'Wallets',
-      icon: '💼',
-      path: '/dashboard',
-      section: 'wallets',
     },
     {
       title: 'Exchange',
@@ -74,12 +68,6 @@ function Sidebar({ isOpen, onToggle }) {
       title: 'Settings',
       icon: '⚙️',
       path: '/settings',
-    },
-    {
-      title: 'Admin Panel',
-      icon: '👑',
-      path: '/admin',
-      adminOnly: true,
     },
   ];
 

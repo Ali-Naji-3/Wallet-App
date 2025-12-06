@@ -46,7 +46,12 @@ function LoginPage() {
     try {
       const data = await loginUser({ email, password });
       localStorage.setItem('fxwallet_token', data.token);
-      navigate('/dashboard');
+      // Redirect admin to admin dashboard
+      if (email.toLowerCase() === 'admin@admin.com') {
+        navigate('/admin-dashboard');
+      } else {
+        navigate('/wallet');
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -108,7 +113,7 @@ function RegisterPage() {
     try {
       const data = await registerUser({ email, password, fullName });
       localStorage.setItem('fxwallet_token', data.token);
-      navigate('/dashboard');
+      navigate('/wallet');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -228,7 +233,7 @@ function ExchangePage() {
       <header className="top-bar">
         <h1>Exchange Currency</h1>
         <nav className="top-nav">
-          <Link to="/dashboard">Back to Dashboard</Link>
+          <Link to="/wallet">Back to Wallet</Link>
         </nav>
       </header>
       <section className="card actions-card" style={{ maxWidth: '600px', margin: '2rem auto' }}>
@@ -403,7 +408,7 @@ function TransferPage() {
       <header className="top-bar">
         <h1>Send / Transfer</h1>
         <nav className="top-nav">
-          <Link to="/dashboard">Back to Dashboard</Link>
+          <Link to="/wallet">Back to Wallet</Link>
         </nav>
       </header>
       <section className="card actions-card" style={{ maxWidth: '700px', margin: '2rem auto' }}>
@@ -726,10 +731,9 @@ function DashboardPage() {
         padding: '1rem',
       }}>
       <header className="top-bar">
-        <h1>FXWallet Dashboard</h1>
+        <h1>FXWallet Wallet</h1>
         <nav className="top-nav">
-          <Link to="/dashboard">Dashboard</Link>
-          <Link to="/admin">Admin Panel</Link>
+          <Link to="/wallet">Wallet</Link>
           <div className="notif-wrapper">
             <button
               type="button"
@@ -913,6 +917,366 @@ function DashboardPage() {
   );
 }
 
+function AdminDashboardPage() {
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
+  const [activeTab, setActiveTab] = useState('content'); // 'content', 'settings', 'users'
+  
+  // Content management state
+  const [contentItems, setContentItems] = useState([
+    { id: 1, title: 'Welcome Message', content: 'Welcome to FXWallet', type: 'text', status: 'active' },
+    { id: 2, title: 'Terms of Service', content: 'Terms and conditions...', type: 'text', status: 'active' },
+    { id: 3, title: 'Privacy Policy', content: 'Privacy policy content...', type: 'text', status: 'active' },
+  ]);
+  const [editingItem, setEditingItem] = useState(null);
+  const [editForm, setEditForm] = useState({ title: '', content: '', type: 'text' });
+
+  const handleLogout = () => {
+    localStorage.removeItem('fxwallet_token');
+    navigate('/login');
+  };
+
+  const handleEdit = (item) => {
+    setEditingItem(item.id);
+    setEditForm({ title: item.title, content: item.content, type: item.type });
+  };
+
+  const handleSave = () => {
+    if (editingItem) {
+      setContentItems(contentItems.map(item => 
+        item.id === editingItem 
+          ? { ...item, ...editForm }
+          : item
+      ));
+      setSuccessMsg('Content updated successfully!');
+      setTimeout(() => setSuccessMsg(''), 3000);
+    } else {
+      // Add new item
+      const newItem = {
+        id: contentItems.length + 1,
+        ...editForm,
+        status: 'active'
+      };
+      setContentItems([...contentItems, newItem]);
+      setSuccessMsg('Content added successfully!');
+      setTimeout(() => setSuccessMsg(''), 3000);
+    }
+    setEditingItem(null);
+    setEditForm({ title: '', content: '', type: 'text' });
+  };
+
+  const handleDelete = (id) => {
+    if (window.confirm('Are you sure you want to delete this content?')) {
+      setContentItems(contentItems.filter(item => item.id !== id));
+      setSuccessMsg('Content deleted successfully!');
+      setTimeout(() => setSuccessMsg(''), 3000);
+    }
+  };
+
+  const handleCancel = () => {
+    setEditingItem(null);
+    setEditForm({ title: '', content: '', type: 'text' });
+  };
+
+  return (
+    <div className="page-container" style={{ minHeight: '100vh', background: '#f8fafc' }}>
+      <header style={{
+        background: 'white',
+        padding: '1.5rem 2rem',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+        marginBottom: '2rem',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      }}>
+        <h1 style={{ margin: 0, color: '#2563eb', fontSize: '1.75rem' }}>
+          Admin Dashboard - Content Management
+        </h1>
+        <button
+          onClick={handleLogout}
+          style={{
+            padding: '0.5rem 1.5rem',
+            background: '#ef4444',
+            color: 'white',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontWeight: '600'
+          }}
+        >
+          Logout
+        </button>
+      </header>
+
+      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 2rem' }}>
+        {/* Tabs */}
+        <div style={{
+          display: 'flex',
+          gap: '1rem',
+          marginBottom: '2rem',
+          borderBottom: '2px solid #e2e8f0'
+        }}>
+          <button
+            onClick={() => setActiveTab('content')}
+            style={{
+              padding: '0.75rem 1.5rem',
+              background: activeTab === 'content' ? '#2563eb' : 'transparent',
+              color: activeTab === 'content' ? 'white' : '#64748b',
+              border: 'none',
+              borderBottom: activeTab === 'content' ? '3px solid #2563eb' : '3px solid transparent',
+              cursor: 'pointer',
+              fontWeight: '600',
+              fontSize: '1rem'
+            }}
+          >
+            Content Management
+          </button>
+          <button
+            onClick={() => setActiveTab('settings')}
+            style={{
+              padding: '0.75rem 1.5rem',
+              background: activeTab === 'settings' ? '#2563eb' : 'transparent',
+              color: activeTab === 'settings' ? 'white' : '#64748b',
+              border: 'none',
+              borderBottom: activeTab === 'settings' ? '3px solid #2563eb' : '3px solid transparent',
+              cursor: 'pointer',
+              fontWeight: '600',
+              fontSize: '1rem'
+            }}
+          >
+            Settings
+          </button>
+        </div>
+
+        {error && (
+          <div style={{
+            padding: '1rem',
+            background: '#fee2e2',
+            color: '#dc2626',
+            borderRadius: '6px',
+            marginBottom: '1rem'
+          }}>
+            {error}
+          </div>
+        )}
+
+        {successMsg && (
+          <div style={{
+            padding: '1rem',
+            background: '#d1fae5',
+            color: '#059669',
+            borderRadius: '6px',
+            marginBottom: '1rem'
+          }}>
+            {successMsg}
+          </div>
+        )}
+
+        {activeTab === 'content' && (
+          <div>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1.5rem'
+            }}>
+              <h2 style={{ margin: 0, color: '#1e293b' }}>Content Items</h2>
+              {!editingItem && (
+                <button
+                  onClick={() => setEditingItem('new')}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    background: '#2563eb',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontWeight: '600'
+                  }}
+                >
+                  + Add New Content
+                </button>
+              )}
+            </div>
+
+            {editingItem && (
+              <div style={{
+                background: 'white',
+                padding: '2rem',
+                borderRadius: '12px',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                marginBottom: '2rem'
+              }}>
+                <h3 style={{ marginTop: 0, marginBottom: '1.5rem' }}>
+                  {editingItem === 'new' ? 'Add New Content' : 'Edit Content'}
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>
+                      Title
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.title}
+                      onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '6px',
+                        fontSize: '1rem'
+                      }}
+                      placeholder="Enter title"
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>
+                      Type
+                    </label>
+                    <select
+                      value={editForm.type}
+                      onChange={(e) => setEditForm({ ...editForm, type: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '6px',
+                        fontSize: '1rem'
+                      }}
+                    >
+                      <option value="text">Text</option>
+                      <option value="html">HTML</option>
+                      <option value="markdown">Markdown</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>
+                      Content
+                    </label>
+                    <textarea
+                      value={editForm.content}
+                      onChange={(e) => setEditForm({ ...editForm, content: e.target.value })}
+                      rows={8}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '6px',
+                        fontSize: '1rem',
+                        fontFamily: 'inherit'
+                      }}
+                      placeholder="Enter content"
+                    />
+                  </div>
+                  <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+                    <button
+                      onClick={handleCancel}
+                      style={{
+                        padding: '0.75rem 1.5rem',
+                        background: '#e2e8f0',
+                        color: '#64748b',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontWeight: '600'
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSave}
+                      style={{
+                        padding: '0.75rem 1.5rem',
+                        background: '#2563eb',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontWeight: '600'
+                      }}
+                    >
+                      Save
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {contentItems.map((item) => (
+                <div
+                  key={item.id}
+                  style={{
+                    background: 'white',
+                    padding: '1.5rem',
+                    borderRadius: '12px',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start'
+                  }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <h3 style={{ margin: '0 0 0.5rem 0', color: '#1e293b' }}>{item.title}</h3>
+                    <p style={{ margin: '0 0 0.5rem 0', color: '#64748b' }}>
+                      Type: {item.type} | Status: {item.status}
+                    </p>
+                    <p style={{ margin: 0, color: '#475569' }}>{item.content}</p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button
+                      onClick={() => handleEdit(item)}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        background: '#2563eb',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem'
+                      }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDelete(item.id)}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        background: '#ef4444',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem'
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'settings' && (
+          <div style={{
+            background: 'white',
+            padding: '2rem',
+            borderRadius: '12px',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+          }}>
+            <h2 style={{ marginTop: 0, color: '#1e293b' }}>Admin Settings</h2>
+            <p style={{ color: '#64748b' }}>Settings panel coming soon...</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function AdminPage() {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -1023,7 +1387,7 @@ function AdminPage() {
           padding: '1rem',
         }}>
           <div className="error-text">Admin access denied or error: {error}</div>
-          <Link to="/dashboard">Back to Dashboard</Link>
+          <Link to="/wallet">Back to Wallet</Link>
         </div>
       </div>
     );
@@ -1051,8 +1415,7 @@ function AdminPage() {
       <header className="top-bar">
         <h1>FXWallet Admin Panel</h1>
         <nav className="top-nav">
-          <Link to="/dashboard">Dashboard</Link>
-          <Link to="/admin">Admin Panel</Link>
+          <Link to="/wallet">Wallet</Link>
           <button type="button" onClick={handleLogout}>
             Logout
           </button>
@@ -1185,7 +1548,7 @@ function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route
-        path="/dashboard"
+        path="/wallet"
         element={
           <ProtectedRoute>
             <DashboardPage />
@@ -1209,14 +1572,14 @@ function App() {
         }
       />
       <Route
-        path="/admin"
+        path="/admin-dashboard"
         element={
           <ProtectedRoute>
-            <AdminPage />
+            <AdminDashboardPage />
           </ProtectedRoute>
         }
       />
-      <Route path="*" element={<Navigate to={isAuthenticated() ? '/dashboard' : '/login'} replace />} />
+      <Route path="*" element={<Navigate to={isAuthenticated() ? '/wallet' : '/login'} replace />} />
     </Routes>
   );
 }
