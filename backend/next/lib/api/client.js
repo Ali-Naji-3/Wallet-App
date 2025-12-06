@@ -1,10 +1,18 @@
 import axios from 'axios';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+// Use relative URLs for Next.js API routes, or fallback to env variable
+const getBaseURL = () => {
+  if (typeof window !== 'undefined') {
+    // In browser: use current origin (same as Next.js app)
+    return window.location.origin;
+  }
+  // Server-side: use env variable or default to localhost:4000
+  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+};
 
 // Create axios instance
 export const apiClient = axios.create({
-  baseURL: API_URL,
+  baseURL: getBaseURL(),
   headers: {
     'Content-Type': 'application/json',
   },

@@ -17,6 +17,8 @@ export const ENDPOINTS = {
     DELETE: (id) => `/api/admin/users/${id}`,
     FREEZE: (id) => `/api/admin/users/${id}/freeze`,
     UNFREEZE: (id) => `/api/admin/users/${id}/unfreeze`,
+    RESET_PASSWORD: (id) => `/api/admin/users/${id}/reset-password`,
+    PROMOTE: (id) => `/api/admin/users/${id}/promote`,
   },
   
   // Admin - Transactions
