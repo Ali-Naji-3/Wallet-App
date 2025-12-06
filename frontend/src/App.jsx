@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate, useNavigate, Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import './App.css';
+import Sidebar from './components/Sidebar';
 import {
   loginUser,
   registerUser,
@@ -54,38 +55,40 @@ function LoginPage() {
   };
 
   return (
-    <div className="auth-container">
-      <h1>FXWallet Login</h1>
-      <form onSubmit={handleSubmit} className="auth-form">
-        <label>
-          Email
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-        </label>
-        <label>
-          Password
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-        </label>
-        {error && <div className="error-text">{error}</div>}
-        <button type="submit" disabled={loading}>
-          {loading ? 'Logging in...' : 'Login'}
-        </button>
-      </form>
-      <p>
-        Don&apos;t have an account?{' '}
-        <button type="button" className="link-button" onClick={() => navigate('/register')}>
-          Register
-        </button>
-      </p>
+    <div className="auth-wrapper">
+      <div className="auth-container">
+        <h1>FXWallet Login</h1>
+        <form onSubmit={handleSubmit} className="auth-form">
+          <label>
+            Email
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </label>
+          <label>
+            Password
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </label>
+          {error && <div className="error-text">{error}</div>}
+          <button type="submit" disabled={loading}>
+            {loading ? 'Logging in...' : 'Login'}
+          </button>
+        </form>
+        <p>
+          Don&apos;t have an account?{' '}
+          <button type="button" className="link-button" onClick={() => navigate('/register')}>
+            Register
+          </button>
+        </p>
+      </div>
     </div>
   );
 }
@@ -114,52 +117,55 @@ function RegisterPage() {
   };
 
   return (
-    <div className="auth-container">
-      <h1>Create FXWallet Account</h1>
-      <form onSubmit={handleSubmit} className="auth-form">
-        <label>
-          Full name
-          <input
-            type="text"
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-          />
-        </label>
-        <label>
-          Email
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-        </label>
-        <label>
-          Password
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-        </label>
-        {error && <div className="error-text">{error}</div>}
-        <button type="submit" disabled={loading}>
-          {loading ? 'Creating account...' : 'Register'}
-        </button>
-      </form>
-      <p>
-        Already have an account?{' '}
-        <button type="button" className="link-button" onClick={() => navigate('/login')}>
-          Login
-        </button>
-      </p>
+    <div className="auth-wrapper">
+      <div className="auth-container">
+        <h1>Create FXWallet Account</h1>
+        <form onSubmit={handleSubmit} className="auth-form">
+          <label>
+            Full name
+            <input
+              type="text"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+            />
+          </label>
+          <label>
+            Email
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </label>
+          <label>
+            Password
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </label>
+          {error && <div className="error-text">{error}</div>}
+          <button type="submit" disabled={loading}>
+            {loading ? 'Creating account...' : 'Register'}
+          </button>
+        </form>
+        <p>
+          Already have an account?{' '}
+          <button type="button" className="link-button" onClick={() => navigate('/login')}>
+            Login
+          </button>
+        </p>
+      </div>
     </div>
   );
 }
 
 function ExchangePage() {
   const navigate = useNavigate();
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [wallets, setWallets] = useState([]);
   const [exchangeForm, setExchangeForm] = useState({
     sourceWalletId: '',
@@ -201,7 +207,17 @@ function ExchangePage() {
   if (loading) return <div className="page-container">Loading...</div>;
 
   return (
-    <div className="page-container">
+    <div className="page-container" style={{ display: 'flex', minHeight: '100vh' }}>
+      <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
+      <div style={{ 
+        position: 'fixed',
+        left: sidebarOpen ? '280px' : '70px',
+        right: 0,
+        top: 0,
+        bottom: 0,
+        overflowY: 'auto',
+        padding: '1rem',
+      }}>
       <header className="top-bar">
         <h1>Exchange Currency</h1>
         <nav className="top-nav">
@@ -273,13 +289,16 @@ function ExchangePage() {
         {actionError && <div className="error-text">{actionError}</div>}
         {actionSuccess && <div className="success-text">{actionSuccess}</div>}
       </section>
+      </div>
     </div>
   );
 }
 
 function TransferPage() {
   const navigate = useNavigate();
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [wallets, setWallets] = useState([]);
+  const [transferMode, setTransferMode] = useState('between'); // 'between' or 'quick'
   const [transferForm, setTransferForm] = useState({
     sourceWalletId: '',
     targetWalletId: '',
@@ -317,18 +336,95 @@ function TransferPage() {
     }
   };
 
-  if (loading) return <div className="page-container">Loading...</div>;
+  const handleModeChange = (mode) => {
+    setTransferMode(mode);
+    setTransferForm({ sourceWalletId: '', targetWalletId: '', amount: '', note: '' });
+    setActionError('');
+    setActionSuccess('');
+  };
+
+  // Filter wallets for "between" mode - exclude source wallet from target options
+  const availableTargetWallets = wallets.filter(
+    (w) => w.id.toString() !== transferForm.sourceWalletId
+  );
+
+  if (loading) {
+    return (
+      <div className="page-container" style={{ display: 'flex', minHeight: '100vh' }}>
+        <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
+        <div style={{ 
+          flex: 1, 
+          marginLeft: sidebarOpen ? '280px' : '70px',
+          transition: 'margin-left 0.3s ease',
+          padding: '1rem',
+        }}>
+          Loading...
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="page-container">
+    <div className="page-container" style={{ display: 'flex', minHeight: '100vh' }}>
+      <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
+      <div style={{ 
+        position: 'fixed',
+        left: sidebarOpen ? '280px' : '70px',
+        right: 0,
+        top: 0,
+        bottom: 0,
+        overflowY: 'auto',
+        padding: '1rem',
+      }}>
       <header className="top-bar">
         <h1>Send / Transfer</h1>
         <nav className="top-nav">
           <Link to="/dashboard">Back to Dashboard</Link>
         </nav>
       </header>
-      <section className="card actions-card" style={{ maxWidth: '600px', margin: '2rem auto' }}>
-        <h2>Quick transfer (same currency)</h2>
+      <section className="card actions-card" style={{ maxWidth: '700px', margin: '2rem auto' }}>
+        <h2>Transfer Options</h2>
+        
+        {/* Transfer Mode Selection */}
+        <div style={{ marginBottom: '2rem', display: 'flex', gap: '1rem', borderBottom: '2px solid #e2e8f0', paddingBottom: '1rem' }}>
+          <button
+            type="button"
+            onClick={() => handleModeChange('between')}
+            style={{
+              flex: 1,
+              padding: '0.75rem 1rem',
+              border: '2px solid',
+              borderColor: transferMode === 'between' ? '#2563eb' : '#e2e8f0',
+              borderRadius: '8px',
+              background: transferMode === 'between' ? '#eff6ff' : 'white',
+              color: transferMode === 'between' ? '#2563eb' : '#64748b',
+              fontWeight: transferMode === 'between' ? '600' : '400',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+            }}
+          >
+            Between My Wallets
+          </button>
+          <button
+            type="button"
+            onClick={() => handleModeChange('quick')}
+            style={{
+              flex: 1,
+              padding: '0.75rem 1rem',
+              border: '2px solid',
+              borderColor: transferMode === 'quick' ? '#2563eb' : '#e2e8f0',
+              borderRadius: '8px',
+              background: transferMode === 'quick' ? '#eff6ff' : 'white',
+              color: transferMode === 'quick' ? '#2563eb' : '#64748b',
+              fontWeight: transferMode === 'quick' ? '600' : '400',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+            }}
+          >
+            Quick Transfer (Same Currency)
+          </button>
+        </div>
+
         <form className="inline-form vertical" onSubmit={handleTransferSubmit}>
           <label>
             From wallet
@@ -339,25 +435,68 @@ function TransferPage() {
               }
               required
             >
-              <option value="">Select</option>
+              <option value="">Select wallet</option>
               {wallets.map((w) => (
                 <option key={w.id} value={w.id}>
-                  {w.currency_code} ({Number(w.balance).toFixed(2)})
+                  {w.currency_code} - Balance: {Number(w.balance).toFixed(2)} {w.currency_code}
                 </option>
               ))}
             </select>
           </label>
-          <label>
-            To wallet ID (can be another user&apos;s wallet)
-            <input
-              type="number"
-              value={transferForm.targetWalletId}
-              onChange={(e) =>
-                setTransferForm((f) => ({ ...f, targetWalletId: e.target.value }))
-              }
-              required
-            />
-          </label>
+
+          {transferMode === 'between' ? (
+            <label>
+              To wallet (my wallets)
+              <select
+                value={transferForm.targetWalletId}
+                onChange={(e) =>
+                  setTransferForm((f) => ({ ...f, targetWalletId: e.target.value }))
+                }
+                required
+                disabled={!transferForm.sourceWalletId}
+              >
+                <option value="">
+                  {transferForm.sourceWalletId ? 'Select target wallet' : 'Select source wallet first'}
+                </option>
+                {availableTargetWallets
+                  .filter((w) => {
+                    // Only show wallets with same currency as source
+                    const sourceWallet = wallets.find((sw) => sw.id.toString() === transferForm.sourceWalletId);
+                    return sourceWallet && w.currency_code === sourceWallet.currency_code;
+                  })
+                  .map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.currency_code} - Balance: {Number(w.balance).toFixed(2)} {w.currency_code}
+                    </option>
+                  ))}
+              </select>
+              {transferForm.sourceWalletId && availableTargetWallets.filter((w) => {
+                const sourceWallet = wallets.find((sw) => sw.id.toString() === transferForm.sourceWalletId);
+                return sourceWallet && w.currency_code === sourceWallet.currency_code;
+              }).length === 0 && (
+                <div style={{ fontSize: '0.875rem', color: '#ef4444', marginTop: '0.25rem' }}>
+                  No wallets with same currency available
+                </div>
+              )}
+            </label>
+          ) : (
+            <label>
+              To wallet ID (can be another user&apos;s wallet)
+              <input
+                type="number"
+                value={transferForm.targetWalletId}
+                onChange={(e) =>
+                  setTransferForm((f) => ({ ...f, targetWalletId: e.target.value }))
+                }
+                placeholder="Enter wallet ID"
+                required
+              />
+              <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
+                Enter the wallet ID of the recipient (must be same currency)
+              </div>
+            </label>
+          )}
+
           <label>
             Amount
             <input
@@ -368,9 +507,16 @@ function TransferPage() {
               onChange={(e) =>
                 setTransferForm((f) => ({ ...f, amount: e.target.value }))
               }
+              placeholder="0.00"
               required
             />
+            {transferForm.sourceWalletId && (
+              <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
+                Available: {wallets.find((w) => w.id.toString() === transferForm.sourceWalletId)?.balance || '0.00'}
+              </div>
+            )}
           </label>
+
           <label>
             Note (optional)
             <input
@@ -379,13 +525,18 @@ function TransferPage() {
               onChange={(e) =>
                 setTransferForm((f) => ({ ...f, note: e.target.value }))
               }
+              placeholder="Add a note for this transfer"
             />
           </label>
-          <button type="submit">Transfer</button>
+
+          <button type="submit" style={{ marginTop: '1rem' }}>
+            {transferMode === 'between' ? 'Transfer Between Wallets' : 'Send Transfer'}
+          </button>
         </form>
         {actionError && <div className="error-text">{actionError}</div>}
         {actionSuccess && <div className="success-text">{actionSuccess}</div>}
       </section>
+      </div>
     </div>
   );
 }
@@ -403,6 +554,7 @@ function DashboardPage() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [updatingWalletId, setUpdatingWalletId] = useState(null);
   const [actionSuccess, setActionSuccess] = useState('');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
     const load = async () => {
       try {
@@ -474,11 +626,35 @@ function DashboardPage() {
   };
 
   if (loading && !profile) {
-    return <div className="page-container">Loading dashboard...</div>;
+    return (
+      <div className="page-container" style={{ display: 'flex', minHeight: '100vh' }}>
+        <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
+        <div style={{ 
+          flex: 1, 
+          marginLeft: sidebarOpen ? '280px' : '70px',
+          transition: 'margin-left 0.3s ease',
+          padding: '1rem',
+        }}>
+          Loading dashboard...
+        </div>
+      </div>
+    );
   }
 
   if (error) {
-    return <div className="page-container">Error: {error}</div>;
+    return (
+      <div className="page-container" style={{ display: 'flex', minHeight: '100vh' }}>
+        <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
+        <div style={{ 
+          flex: 1, 
+          marginLeft: sidebarOpen ? '280px' : '70px',
+          transition: 'margin-left 0.3s ease',
+          padding: '1rem',
+        }}>
+          Error: {error}
+        </div>
+      </div>
+    );
   }
 
   const totalValue =
@@ -487,7 +663,17 @@ function DashboardPage() {
       : '0.00';
 
   return (
-    <div className="page-container">
+    <div className="page-container" style={{ display: 'flex', minHeight: '100vh' }}>
+      <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
+      <div style={{ 
+        position: 'fixed',
+        left: sidebarOpen ? '280px' : '70px',
+        right: 0,
+        top: 0,
+        bottom: 0,
+        overflowY: 'auto',
+        padding: '1rem',
+      }}>
       <header className="top-bar">
         <h1>FXWallet Dashboard</h1>
         <nav className="top-nav">
@@ -671,12 +857,14 @@ function DashboardPage() {
           </table>
         )}
       </section>
+      </div>
     </div>
   );
 }
 
 function AdminPage() {
   const navigate = useNavigate();
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
   const [transactions, setTransactions] = useState([]);
@@ -738,20 +926,50 @@ function AdminPage() {
   };
 
   if (loading) {
-    return <div className="page-container">Loading admin panel...</div>;
+    return (
+      <div className="page-container" style={{ display: 'flex', minHeight: '100vh' }}>
+        <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
+        <div style={{ 
+          flex: 1, 
+          marginLeft: sidebarOpen ? '280px' : '70px',
+          transition: 'margin-left 0.3s ease',
+          padding: '1rem',
+        }}>
+          Loading admin panel...
+        </div>
+      </div>
+    );
   }
 
   if (error) {
     return (
-      <div className="page-container">
-        <div className="error-text">Admin access denied or error: {error}</div>
-        <Link to="/dashboard">Back to Dashboard</Link>
+      <div className="page-container" style={{ display: 'flex', minHeight: '100vh' }}>
+        <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
+        <div style={{ 
+          flex: 1, 
+          marginLeft: sidebarOpen ? '280px' : '70px',
+          transition: 'margin-left 0.3s ease',
+          padding: '1rem',
+        }}>
+          <div className="error-text">Admin access denied or error: {error}</div>
+          <Link to="/dashboard">Back to Dashboard</Link>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="page-container">
+    <div className="page-container" style={{ display: 'flex', minHeight: '100vh' }}>
+      <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
+      <div style={{ 
+        position: 'fixed',
+        left: sidebarOpen ? '280px' : '70px',
+        right: 0,
+        top: 0,
+        bottom: 0,
+        overflowY: 'auto',
+        padding: '1rem',
+      }}>
       <header className="top-bar">
         <h1>FXWallet Admin Panel</h1>
         <nav className="top-nav">
@@ -878,6 +1096,7 @@ function AdminPage() {
           </tbody>
         </table>
       </section>
+      </div>
     </div>
   );
 }
