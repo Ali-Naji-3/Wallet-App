@@ -18,8 +18,19 @@ export const requireAuth = async (req, res, next) => {
     const decoded = jwt.verify(token, secret);
     const user = await findUserById(decoded.sub);
 
-    if (!user || !user.is_active) {
-      return res.status(401).json({ message: 'Invalid or inactive user' });
+    if (!user) {
+      return res.status(401).json({ message: 'User not found' });
+    }
+    
+    // SECURITY: Block frozen/suspended accounts
+    if (!user.is_active) {
+      console.log(`[Auth Middleware] Blocked frozen account: ${user.email}`);
+      return res.status(403).json({ 
+        message: 'Account Suspended',
+        error: 'ACCESS_DENIED',
+        details: 'Your account has been suspended. Please contact support.',
+        code: 'ACCOUNT_SUSPENDED'
+      });
     }
 
     // Attach user to request for downstream handlers

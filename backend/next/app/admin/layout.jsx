@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useGetIdentity, useLogout } from '@refinedev/core';
+import { useGetIdentity, useLogout, useIsAuthenticated } from '@refinedev/core';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -15,6 +15,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import ThemeToggle from '@/components/ThemeToggle';
+import NotificationBell from '@/components/NotificationBell';
+import { clearAuthData } from '@/lib/auth/storage';
 import {
   LayoutDashboard,
   Users,
@@ -42,6 +44,7 @@ import {
   Image,
   Star,
   Home,
+  Loader2,
 } from 'lucide-react';
 
 // Sidebar menu structure with collapsible sections
@@ -57,6 +60,14 @@ const menuSections = [
     collapsible: true,
     items: [
       { name: 'Users (Customers & Admins)', href: '/admin/users', icon: Users },
+    ],
+  },
+  { 
+    title: 'KYC & Verification',
+    collapsible: true,
+    items: [
+      { name: 'Pending Reviews', href: '/admin/kyc', icon: AlertCircle },
+      { name: 'Verified Users', href: '/admin/kyc/verified', icon: FileCheck },
     ],
   },
   {
@@ -75,14 +86,6 @@ const menuSections = [
       { name: 'All Transactions', href: '/admin/transactions', icon: ArrowLeftRight },
       { name: 'Pending', href: '/admin/transactions/pending', icon: Clock },
       { name: 'Completed', href: '/admin/transactions/completed', icon: CheckCircle },
-    ],
-  },
-  { 
-    title: 'KYC & Verification',
-    collapsible: true,
-    items: [
-      { name: 'Pending Reviews', href: '/admin/kyc', icon: AlertCircle },
-      { name: 'Verified Users', href: '/admin/kyc/verified', icon: FileCheck },
     ],
   },
   {
@@ -181,7 +184,8 @@ function SidebarSection({ section, pathname, expandedSections, toggleSection }) 
 export default function AdminLayout({ children }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { data: identity } = useGetIdentity();
+  const { data: identity, isLoading: identityLoading } = useGetIdentity();
+  const { data: authData, isLoading: authLoading } = useIsAuthenticated();
   const { mutate: logout } = useLogout();
   
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -190,6 +194,16 @@ export default function AdminLayout({ children }) {
     'Wallet Management',
     'Transactions',
   ]);
+
+  // SECURITY: Redirect to login if not authenticated
+  useEffect(() => {
+    if (!authLoading && !authData?.authenticated) {
+      console.log('[Admin Layout] Not authenticated - redirecting to login');
+      // Clear any stale data
+      clearAuthData();
+      router.replace('/login');
+    }
+  }, [authData, authLoading, router]);
 
   const toggleSection = (title) => {
     setExpandedSections(prev =>
@@ -203,6 +217,23 @@ export default function AdminLayout({ children }) {
     logout();
     router.push('/login');
   };
+
+  // Show loading while checking auth
+  if (authLoading || identityLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-950">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-amber-500 mx-auto" />
+          <p className="mt-2 text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // Don't render if not authenticated
+  if (!authData?.authenticated) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 transition-colors duration-300">
@@ -327,10 +358,7 @@ export default function AdminLayout({ children }) {
             <ThemeToggle />
             
             {/* Notifications */}
-            <Button variant="ghost" size="icon" className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5">
-              <Bell className="h-5 w-5" />
-              <span className="absolute top-1 right-1 h-2 w-2 bg-amber-500 rounded-full"></span>
-            </Button>
+            <NotificationBell />
             
             {/* User info (desktop) */}
             <div className="hidden md:flex items-center gap-2 pl-3 border-l border-gray-300 dark:border-gray-700">

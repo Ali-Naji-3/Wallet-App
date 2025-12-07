@@ -63,6 +63,7 @@ export async function POST(req) {
       {
         id: userId,
         email: email,
+        role: 'user', // New users are always regular users
       },
       secret,
       { expiresIn: '1d' } // Token expires in 1 day

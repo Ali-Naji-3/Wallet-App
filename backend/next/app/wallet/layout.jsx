@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useGetIdentity, useLogout } from '@refinedev/core';
+import { useGetIdentity, useLogout, useIsAuthenticated } from '@refinedev/core';
 import { cn } from '@/lib/utils';
+import { clearAuthData } from '@/lib/auth/storage';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import ThemeToggle from '@/components/ThemeToggle';
@@ -32,6 +33,8 @@ import {
   CreditCard,
   History,
   PiggyBank,
+  Shield,
+  Loader2,
 } from 'lucide-react';
 
 const navItems = [
@@ -40,15 +43,44 @@ const navItems = [
   { name: 'Receive', href: '/wallet/receive', icon: Download },
   { name: 'Transactions', href: '/wallet/transactions', icon: History },
   { name: 'Exchange', href: '/wallet/exchange', icon: RefreshCw },
+  { name: 'Verify Identity', href: '/wallet/kyc', icon: Shield },
 ];
 
 export default function WalletLayout({ children }) {
+  // ALL HOOKS MUST BE CALLED FIRST - before any conditional returns
   const pathname = usePathname();
   const router = useRouter();
-  const { data: identity } = useGetIdentity();
+  const { data: identity, isLoading: identityLoading } = useGetIdentity();
+  const { data: authData, isLoading: authLoading } = useIsAuthenticated();
   const { mutate: logout } = useLogout();
-  
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  
+  // SECURITY: Redirect to login if not authenticated
+  useEffect(() => {
+    if (!authLoading && !authData?.authenticated) {
+      console.log('[Wallet Layout] Not authenticated - redirecting to login');
+      // Clear any stale data
+      clearAuthData();
+      router.replace('/login');
+    }
+  }, [authData, authLoading, router]);
+  
+  // Show loading while checking auth
+  if (authLoading || identityLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-950">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-amber-500 mx-auto" />
+          <p className="mt-2 text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // Don't render if not authenticated
+  if (!authData?.authenticated) {
+    return null;
+  }
 
   const handleLogout = () => {
     logout();

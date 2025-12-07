@@ -43,7 +43,16 @@ import {
   Loader2,
   AlertTriangle,
   ChevronRight,
+  FileCheck,
+  CheckCircle,
+  XCircle,
+  Clock,
+  ScanFace,
+  Fingerprint,
+  Camera,
+  Eye,
 } from 'lucide-react';
+import { format } from 'date-fns';
 
 export default function UserShowPage() {
   const params = useParams();
@@ -56,6 +65,12 @@ export default function UserShowPage() {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  
+  // KYC state
+  const [kycData, setKycData] = useState(null);
+  const [kycHistory, setKycHistory] = useState([]);
+  const [kycLoading, setKycLoading] = useState(false);
+  const [kycImagePreview, setKycImagePreview] = useState(null);
 
   const [deleteModal, setDeleteModal] = useState(false);
   const [resetPasswordModal, setResetPasswordModal] = useState(false);
@@ -77,12 +92,36 @@ export default function UserShowPage() {
     }
   };
 
+  const fetchKYC = async () => {
+    setKycLoading(true);
+    try {
+      const { data } = await apiClient.get(`/api/admin/kyc?search=${user?.email || ''}`);
+      const userKYC = data.verifications?.filter(k => k.user_id === parseInt(userId));
+      if (userKYC?.length > 0) {
+        // Get full details for latest KYC
+        const { data: detail } = await apiClient.get(`/api/admin/kyc/${userKYC[0].id}`);
+        setKycData(detail.kyc);
+        setKycHistory(detail.history || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch KYC', err);
+    } finally {
+      setKycLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (userId) {
       fetchUser();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchKYC();
+    }
+  }, [user?.id]);
 
   const handleFreezeToggle = async () => {
     if (!user) return;
@@ -365,6 +404,10 @@ export default function UserShowPage() {
           <TabsTrigger value="activity" className="data-[state=active]:bg-white dark:data-[state=active]:bg-gray-900">
             Activity
           </TabsTrigger>
+          <TabsTrigger value="kyc" className="data-[state=active]:bg-white dark:data-[state=active]:bg-gray-900">
+            <FileCheck className="h-4 w-4 mr-1" />
+            KYC
+          </TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
@@ -521,7 +564,303 @@ export default function UserShowPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* KYC Tab */}
+        <TabsContent value="kyc" className="space-y-4">
+          {kycLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-amber-500" />
+            </div>
+          ) : !kycData ? (
+            <Card className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <FileCheck className="h-12 w-12 text-gray-400 mb-4" />
+                <p className="text-gray-600 dark:text-gray-400">No KYC verification submitted</p>
+                <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">
+                  This user has not yet submitted identity verification documents.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              {/* KYC Status Card */}
+              <Card className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 shadow-lg">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-gray-900 dark:text-white flex items-center gap-2">
+                      <Shield className="h-5 w-5 text-amber-500" />
+                      KYC Verification Status
+                    </CardTitle>
+                    <Badge className={
+                      kycData.status === 'approved' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' :
+                      kycData.status === 'pending' ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' :
+                      kycData.status === 'under_review' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' :
+                      'bg-red-500/20 text-red-400 border-red-500/30'
+                    }>
+                      {kycData.status?.replace('_', ' ').toUpperCase()}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {/* Verification Scores */}
+                  <div className="grid grid-cols-3 gap-4 mb-6">
+                    <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800 text-center">
+                      <ScanFace className={`h-8 w-8 mx-auto mb-2 ${
+                        kycData.face_match_score >= 80 ? 'text-emerald-400' : 
+                        kycData.face_match_score >= 60 ? 'text-amber-400' : 'text-red-400'
+                      }`} />
+                      <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                        {kycData.face_match_score || 0}%
+                      </p>
+                      <p className="text-xs text-gray-500">Face Match</p>
+                    </div>
+                    <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800 text-center">
+                      <Fingerprint className={`h-8 w-8 mx-auto mb-2 ${
+                        kycData.liveness_passed ? 'text-emerald-400' : 'text-red-400'
+                      }`} />
+                      <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                        {kycData.liveness_passed ? 'Passed' : 'Failed'}
+                      </p>
+                      <p className="text-xs text-gray-500">Liveness</p>
+                    </div>
+                    <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800 text-center">
+                      <Shield className={`h-8 w-8 mx-auto mb-2 ${
+                        kycData.document_authentic ? 'text-emerald-400' : 
+                        kycData.document_authentic === false ? 'text-red-400' : 'text-gray-400'
+                      }`} />
+                      <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                        {kycData.document_authentic === true ? 'Valid' : 
+                         kycData.document_authentic === false ? 'Invalid' : 'Pending'}
+                      </p>
+                      <p className="text-xs text-gray-500">Document</p>
+                    </div>
+                  </div>
+
+                  {/* Details Grid */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Full Name</p>
+                      <p className="font-medium text-gray-900 dark:text-white">
+                        {kycData.first_name} {kycData.last_name}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Date of Birth</p>
+                      <p className="font-medium text-gray-900 dark:text-white">
+                        {kycData.date_of_birth ? format(new Date(kycData.date_of_birth), 'PPP') : '--'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Document Type</p>
+                      <p className="font-medium text-gray-900 dark:text-white capitalize">
+                        {kycData.document_type?.replace('_', ' ')}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Document Number</p>
+                      <p className="font-medium text-gray-900 dark:text-white">
+                        {kycData.document_number || '--'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Nationality</p>
+                      <p className="font-medium text-gray-900 dark:text-white">
+                        {kycData.nationality || '--'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Tier</p>
+                      <p className="font-medium text-gray-900 dark:text-white">
+                        Tier {kycData.tier}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Submitted</p>
+                      <p className="font-medium text-gray-900 dark:text-white">
+                        {kycData.submitted_at ? format(new Date(kycData.submitted_at), 'PPpp') : '--'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Reviewed</p>
+                      <p className="font-medium text-gray-900 dark:text-white">
+                        {kycData.reviewed_at ? format(new Date(kycData.reviewed_at), 'PPpp') : 'Not yet'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {kycData.rejection_reason && (
+                    <div className="mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30">
+                      <p className="text-sm font-medium text-red-400">Rejection Reason:</p>
+                      <p className="text-gray-600 dark:text-gray-300">{kycData.rejection_reason}</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Documents */}
+              <Card className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 shadow-lg">
+                <CardHeader>
+                  <CardTitle className="text-gray-900 dark:text-white flex items-center gap-2">
+                    <Camera className="h-5 w-5 text-amber-500" />
+                    Submitted Documents
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-3 gap-4">
+                    {/* ID Front */}
+                    <div className="space-y-2">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">ID Front</p>
+                      {kycData.id_front_image ? (
+                        <div 
+                          className="aspect-video rounded-lg overflow-hidden cursor-pointer group relative bg-gray-100 dark:bg-gray-800"
+                          onClick={() => setKycImagePreview(kycData.id_front_image)}
+                        >
+                          <img 
+                            src={kycData.id_front_image} 
+                            alt="ID Front" 
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <Eye className="h-6 w-6 text-white" />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="aspect-video rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                          <CreditCard className="h-8 w-8 text-gray-400" />
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* ID Back */}
+                    <div className="space-y-2">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">ID Back</p>
+                      {kycData.id_back_image ? (
+                        <div 
+                          className="aspect-video rounded-lg overflow-hidden cursor-pointer group relative bg-gray-100 dark:bg-gray-800"
+                          onClick={() => setKycImagePreview(kycData.id_back_image)}
+                        >
+                          <img 
+                            src={kycData.id_back_image} 
+                            alt="ID Back" 
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <Eye className="h-6 w-6 text-white" />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="aspect-video rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                          <span className="text-xs text-gray-400">Not provided</span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Selfie */}
+                    <div className="space-y-2">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">Selfie</p>
+                      {kycData.selfie_image ? (
+                        <div 
+                          className="aspect-video rounded-lg overflow-hidden cursor-pointer group relative bg-gray-100 dark:bg-gray-800"
+                          onClick={() => setKycImagePreview(kycData.selfie_image)}
+                        >
+                          <img 
+                            src={kycData.selfie_image} 
+                            alt="Selfie" 
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <Eye className="h-6 w-6 text-white" />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="aspect-video rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                          <ScanFace className="h-8 w-8 text-gray-400" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* KYC History */}
+              {kycHistory.length > 0 && (
+                <Card className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 shadow-lg">
+                  <CardHeader>
+                    <CardTitle className="text-gray-900 dark:text-white flex items-center gap-2">
+                      <Clock className="h-5 w-5 text-amber-500" />
+                      Previous Submissions
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {kycHistory.map((item) => (
+                        <div 
+                          key={item.id}
+                          className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800 flex items-center justify-between"
+                        >
+                          <div className="flex items-center gap-3">
+                            <Badge className={
+                              item.status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' :
+                              item.status === 'pending' ? 'bg-amber-500/20 text-amber-400' :
+                              item.status === 'under_review' ? 'bg-blue-500/20 text-blue-400' :
+                              'bg-red-500/20 text-red-400'
+                            }>
+                              {item.status?.replace('_', ' ')}
+                            </Badge>
+                            <span className="text-sm text-gray-600 dark:text-gray-300 capitalize">
+                              {item.document_type?.replace('_', ' ')}
+                            </span>
+                          </div>
+                          <span className="text-xs text-gray-500">
+                            {item.submitted_at ? format(new Date(item.submitted_at), 'PPP') : '--'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Quick Actions for pending KYC */}
+              {['pending', 'under_review'].includes(kycData.status) && (
+                <Card className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 shadow-lg">
+                  <CardHeader>
+                    <CardTitle className="text-gray-900 dark:text-white">Quick Actions</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex gap-3">
+                      <Link href={`/admin/kyc`}>
+                        <Button className="bg-amber-500 hover:bg-amber-600 text-gray-900">
+                          <Eye className="h-4 w-4 mr-2" />
+                          Review in KYC Queue
+                        </Button>
+                      </Link>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          )}
+        </TabsContent>
       </Tabs>
+
+      {/* KYC Image Preview Modal */}
+      <Dialog open={!!kycImagePreview} onOpenChange={() => setKycImagePreview(null)}>
+        <DialogContent className="max-w-4xl bg-black border-gray-800">
+          <DialogHeader>
+            <DialogTitle className="text-white">Document Preview</DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center justify-center min-h-[50vh]">
+            {kycImagePreview && (
+              <img 
+                src={kycImagePreview} 
+                alt="Preview" 
+                className="max-w-full max-h-[70vh] object-contain"
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Modal */}
       <Dialog open={deleteModal} onOpenChange={setDeleteModal}>

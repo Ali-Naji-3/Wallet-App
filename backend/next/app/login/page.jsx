@@ -1,13 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLogin } from '@refinedev/core';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Wallet, Mail, Lock, Loader2, AlertCircle } from 'lucide-react';
+import { Wallet, Mail, Lock, Loader2, AlertCircle, ShieldX, Phone } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
@@ -28,11 +28,26 @@ export default function LoginPage() {
     confirmPassword: '',
   });
   const [error, setError] = useState('');
+  const [suspendedAccount, setSuspendedAccount] = useState(null); // { message, details }
   const [isRegistering, setIsRegistering] = useState(false);
+
+  // Check for suspended message on page load (when redirected from a frozen account)
+  useEffect(() => {
+    const suspendedMessage = sessionStorage.getItem('suspended_message');
+    if (suspendedMessage) {
+      setSuspendedAccount({
+        message: 'Account Suspended',
+        details: suspendedMessage,
+      });
+      // Clear the message after showing it
+      sessionStorage.removeItem('suspended_message');
+    }
+  }, []);
 
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setSuspendedAccount(null);
 
     if (!formData.email || !formData.password) {
       setError('Please enter both email and password');
@@ -48,8 +63,9 @@ export default function LoginPage() {
         onSuccess: (data) => {
           toast.success('Login successful!');
           
-          // Redirect based on role
-          const role = data?.user?.role || localStorage.getItem('user_role');
+          // Redirect based on role from FRESH login response only
+          // Never use cached localStorage here as it could be stale
+          const role = data?.user?.role;
           
           if (role === 'admin') {
             router.push('/admin/dashboard');
@@ -58,8 +74,24 @@ export default function LoginPage() {
           }
         },
         onError: (err) => {
-          setError(err?.message || 'Invalid credentials');
-          toast.error('Login failed');
+          // Check if account is suspended (multiple ways to detect)
+          const errorMessage = err?.message || '';
+          const isSuspended = 
+            err?.code === 'ACCOUNT_SUSPENDED' || 
+            err?.name === 'AccountSuspended' ||
+            errorMessage.toLowerCase().includes('suspended') ||
+            errorMessage.toLowerCase().includes('account suspended');
+          
+          if (isSuspended) {
+            setSuspendedAccount({
+              message: 'Account Suspended',
+              details: errorMessage || 'Your account has been suspended. Please contact support for assistance.',
+            });
+            toast.error('Account Suspended');
+          } else {
+            setError(errorMessage || 'Invalid credentials');
+            toast.error('Login failed');
+          }
         },
       }
     );
@@ -180,10 +212,36 @@ export default function LoginPage() {
         </CardHeader>
         
         <CardContent className="pt-4">
+          {/* Suspended Account Warning */}
+          {suspendedAccount && (
+            <div className="mb-4 p-4 rounded-xl bg-gradient-to-br from-red-950/50 to-red-900/30 border border-red-500/30">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-red-500/20">
+                  <ShieldX className="h-5 w-5 text-red-400" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-red-400 text-sm">{suspendedAccount.message}</h3>
+                  <p className="mt-1 text-xs text-red-300/80">{suspendedAccount.details}</p>
+                  <div className="mt-3 flex items-center gap-2 text-xs text-gray-400">
+                    <Phone className="h-3 w-3" />
+                    <span>Contact support: <a href="mailto:support@fxwallet.com" className="text-amber-400 hover:underline">support@fxwallet.com</a></span>
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSuspendedAccount(null)}
+                className="mt-3 w-full text-xs text-gray-500 hover:text-gray-400"
+              >
+                Try another account
+              </button>
+            </div>
+          )}
+
           {mode === 'login' ? (
             <form onSubmit={handleLoginSubmit} className="space-y-4">
               {/* Error message */}
-              {error && (
+              {error && !suspendedAccount && (
                 <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
                   <AlertCircle className="h-4 w-4 flex-shrink-0" />
                   {error}

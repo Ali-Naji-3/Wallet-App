@@ -5,13 +5,23 @@ import { requireAdmin } from '@/lib/admin';
 
 export async function GET(req) {
   try {
-    const token = parseBearer(req.headers.get('authorization') || undefined);
+    const authHeader = req.headers.get('authorization');
+    const token = parseBearer(authHeader || undefined);
+    
     if (!token) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+      console.log('[Admin Stats] No token provided');
+      return NextResponse.json({ message: 'Unauthorized: No token provided' }, { status: 401 });
     }
 
     // Verify admin access
-    await requireAdmin(token);
+    try {
+      await requireAdmin(token);
+    } catch (authError) {
+      console.error('[Admin Stats] Auth error:', authError.message);
+      return NextResponse.json({ 
+        message: authError.message || 'Unauthorized' 
+      }, { status: 401 });
+    }
 
     const pool = getPool();
 

@@ -2,10 +2,11 @@
 
 import { Refine } from '@refinedev/core';
 import routerProvider from '@refinedev/nextjs-router';
-import { dataProvider } from '@/lib/refine/data-provider';
+import dataProvider from '@/lib/refine/data-provider';
 import { authProvider } from '@/lib/refine/auth-provider';
 import { accessControlProvider } from '@/lib/refine/access-control';
 import { ThemeProvider } from '@/contexts/ThemeContext';
+import { queryConfigs } from '@/lib/react-query-config';
 
 export default function RefineProvider({ children }) {
   return (
@@ -48,8 +49,27 @@ export default function RefineProvider({ children }) {
       ]}
       options={{
         syncWithLocation: true,
-        warnWhenUnsavedChanges: true,
+        warnWhenUnsavedChanges: false, // Disable to improve performance
         projectId: 'fxwallet-admin',
+        reactQuery: {
+          devtoolConfig: false, // Disable devtools in production
+          // OPTIMIZATION: Configure React Query caching
+          clientConfig: {
+            defaultOptions: {
+              queries: {
+                staleTime: 5 * 60 * 1000, // 5 minutes - data stays fresh
+                gcTime: 10 * 60 * 1000, // 10 minutes - keep in cache
+                retry: 1, // Retry once on failure
+                refetchOnWindowFocus: true, // Refetch when window regains focus
+                refetchOnReconnect: true, // Refetch on reconnect
+                refetchOnMount: true, // Refetch on component mount
+              },
+              mutations: {
+                retry: 1, // Retry failed mutations once
+              },
+            },
+          },
+        },
       }}
     >
       {children}

@@ -11,23 +11,81 @@ export async function POST(req, { params }) {
     }
 
     await requireAdmin(token);
-    const userId = parseInt(params.id, 10);
+    
+    // Handle params - might be a Promise in Next.js 15+
+    let resolvedParams = params;
+    if (params && typeof params.then === 'function') {
+      resolvedParams = await params;
+    }
+    
+    // Try to get ID from params or URL
+    let userId = null;
+    if (resolvedParams?.id) {
+      userId = parseInt(String(resolvedParams.id), 10);
+    } else {
+      // Fallback: extract from URL pathname
+      // URL format: /api/admin/users/4/unfreeze
+      // Segments: ['api', 'admin', 'users', '4', 'unfreeze']
+      const url = new URL(req.url);
+      const segments = url.pathname.split('/').filter(Boolean);
+      const usersIndex = segments.indexOf('users');
+      if (usersIndex !== -1 && segments[usersIndex + 1]) {
+        userId = parseInt(segments[usersIndex + 1], 10);
+      }
+    }
 
-    if (!userId) {
-      return NextResponse.json({ message: 'Invalid user ID' }, { status: 400 });
+    if (!userId || isNaN(userId) || userId <= 0) {
+      console.error('[Unfreeze] Invalid user ID. Params:', resolvedParams, 'URL:', req.url);
+      return NextResponse.json({ 
+        message: 'Invalid user ID',
+        debug: { params: resolvedParams, url: req.url }
+      }, { status: 400 });
     }
 
     const pool = getPool();
 
-    // Unfreeze user
-    await pool.query(
-      `UPDATE users SET is_active = 1 WHERE id = ?`,
+    // First check if user exists
+    const [userCheck] = await pool.query(
+      `SELECT id, email, full_name, is_active FROM users WHERE id = ? LIMIT 1`,
       [userId]
     );
 
+    if (!userCheck || userCheck.length === 0) {
+      return NextResponse.json({ message: 'User not found' }, { status: 404 });
+    }
+
+    const existingUser = userCheck[0];
+    
+    // If user is already active, return success
+    if (existingUser.is_active === 1) {
+      return NextResponse.json({
+        message: 'User account is already active',
+        user: {
+          id: existingUser.id,
+          email: existingUser.email,
+          isActive: true,
+        },
+      });
+    }
+
+    // Check if suspension_reason column exists and clear it
+    let updateQuery = `UPDATE users SET is_active = 1`;
+    try {
+      const [cols] = await pool.query(`SHOW COLUMNS FROM users LIKE 'suspension_reason'`);
+      if (cols.length > 0) {
+        updateQuery += `, suspension_reason = NULL`;
+      }
+    } catch (colErr) {
+      // Column doesn't exist, continue without it
+    }
+    updateQuery += ` WHERE id = ?`;
+    
+    // Unfreeze user and clear suspension reason
+    await pool.query(updateQuery, [userId]);
+
     // Get updated user
     const [userRows] = await pool.query(
-      `SELECT id, email, is_active FROM users WHERE id = ? LIMIT 1`,
+      `SELECT id, email, full_name, is_active FROM users WHERE id = ? LIMIT 1`,
       [userId]
     );
 
@@ -39,11 +97,13 @@ export async function POST(req, { params }) {
        VALUES (?, ?, ?, ?)`,
       [
         userId,
-        'Account unfrozen',
-        'Your account has been unfrozen and is now active again.',
+        'Account Reactivated',
+        'Good news! Your account has been reactivated. You can now log in and access all features again.',
         'security',
       ]
     );
+    
+    console.log(`[Admin] User ${userId} (${user.email}) account REACTIVATED`);
 
     return NextResponse.json({
       message: 'User account unfrozen',

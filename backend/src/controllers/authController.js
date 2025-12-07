@@ -24,7 +24,9 @@ const buildToken = (user) => {
   return jwt.sign(
     {
       sub: user.id,
+      id: user.id,
       email: user.email,
+      role: user.role || 'user',
     },
     secret,
     { expiresIn: JWT_EXPIRES_IN }
@@ -96,8 +98,22 @@ export const login = async (req, res) => {
     }
 
     const user = await findUserByEmail(email);
-    if (!user || !user.is_active) {
+    
+    // Check if user exists
+    if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' });
+    }
+    
+    // Check if account is frozen/suspended BEFORE password check
+    if (!user.is_active) {
+      console.log(`[Login] Blocked frozen account: ${email}`);
+      return res.status(403).json({ 
+        message: 'Account Suspended',
+        error: 'ACCESS_DENIED',
+        details: 'Your account has been suspended. Please contact support for assistance.',
+        contactSupport: true,
+        code: 'ACCOUNT_SUSPENDED'
+      });
     }
 
     const valid = await bcrypt.compare(password, user.password_hash);
@@ -134,6 +150,17 @@ export const getProfile = async (req, res) => {
     const user = await findUserById(userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
+    }
+
+    // SECURITY: Check if account is frozen
+    if (!user.is_active) {
+      console.log(`[Profile] Blocked frozen account: ${user.email}`);
+      return res.status(403).json({ 
+        message: 'Account Suspended',
+        error: 'ACCESS_DENIED',
+        details: 'Your account has been suspended. Please contact support.',
+        code: 'ACCOUNT_SUSPENDED'
+      });
     }
 
     return res.json({

@@ -146,3 +146,6 @@ export const dataProvider = {
   },
 };
 
+// Default export for Refine compatibility
+export default dataProvider;
+

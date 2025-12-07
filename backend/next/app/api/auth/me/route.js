@@ -15,7 +15,7 @@ export async function GET(req) {
 
     const pool = getPool();
     const [rows] = await pool.query(
-      `SELECT id, email, full_name AS fullName, base_currency AS baseCurrency, timezone
+      `SELECT id, email, full_name AS fullName, base_currency AS baseCurrency, timezone, role, is_active
        FROM users WHERE id = ? LIMIT 1`,
       [user.id]
     );
@@ -23,7 +23,29 @@ export async function GET(req) {
     if (!found) {
       return NextResponse.json({ message: 'Not found' }, { status: 404 });
     }
-    return NextResponse.json(found);
+    
+    // SECURITY: Check if account is frozen/suspended
+    if (!found.is_active) {
+      console.log(`[Auth/Me] Blocked frozen account access: ${found.email}`);
+      return NextResponse.json({ 
+        message: 'Account Suspended',
+        error: 'ACCESS_DENIED',
+        details: 'Your account has been suspended. Please contact support.',
+        code: 'ACCOUNT_SUSPENDED'
+      }, { status: 403 });
+    }
+    
+    return NextResponse.json({ 
+      user: {
+        id: found.id,
+        email: found.email,
+        fullName: found.fullName,
+        baseCurrency: found.baseCurrency,
+        timezone: found.timezone,
+        role: found.role || 'user',
+        isActive: !!found.is_active,
+      }
+    });
   } catch (err) {
     return NextResponse.json({ message: err?.message || 'Failed to get profile' }, { status: 500 });
   }

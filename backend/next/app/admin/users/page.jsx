@@ -82,7 +82,7 @@ export default function UsersPage() {
   const [newPassword, setNewPassword] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
 
-  const fetchUsers = async (pageToLoad = page) => {
+  const fetchUsers = async (pageToLoad = page, signal = null) => {
     try {
       setLoading(true);
       setError('');
@@ -93,6 +93,8 @@ export default function UsersPage() {
           limit: perPage,
           search: searchQuery || undefined,
         },
+        signal, // Add abort signal
+        timeout: 30000, // 30 second timeout
       });
 
       const mappedUsers = (data.users || []).map((u) => ({
@@ -109,6 +111,17 @@ export default function UsersPage() {
       setTotalPages(data.pagination?.totalPages || 1);
       setPage(data.pagination?.page || pageToLoad);
     } catch (err) {
+      // Don't log error if request was aborted/cancelled (component unmounted)
+      if (
+        err.code === 'ECONNABORTED' || 
+        err.code === 'ERR_CANCELED' ||
+        err.name === 'AbortError' || 
+        err.name === 'CanceledError' ||
+        err.message === 'Request aborted' ||
+        err.message === 'canceled'
+      ) {
+        return; // Silently ignore aborted/cancelled requests
+      }
       console.error('Failed to fetch users', err);
       setError(err?.response?.data?.message || 'Failed to load users');
     } finally {
@@ -117,21 +130,45 @@ export default function UsersPage() {
   };
 
   useEffect(() => {
-    fetchUsers();
+    const abortController = new AbortController();
+    fetchUsers(page, abortController.signal);
+    
+    return () => {
+      abortController.abort(); // Cancel request on unmount
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [perPage, searchQuery]);
 
-  const fetchStats = async () => {
+  const fetchStats = async (signal = null) => {
     try {
-      const { data } = await apiClient.get(ENDPOINTS.ADMIN_STATS.DASHBOARD);
+      const { data } = await apiClient.get(ENDPOINTS.ADMIN_STATS.DASHBOARD, {
+        signal, // Add abort signal
+        timeout: 30000, // 30 second timeout
+      });
       setStats(data?.users || null);
     } catch (err) {
+      // Don't log error if request was aborted/cancelled (component unmounted)
+      if (
+        err.code === 'ECONNABORTED' || 
+        err.code === 'ERR_CANCELED' ||
+        err.name === 'AbortError' || 
+        err.name === 'CanceledError' ||
+        err.message === 'Request aborted' ||
+        err.message === 'canceled'
+      ) {
+        return; // Silently ignore aborted/cancelled requests
+      }
       console.error('Failed to fetch admin stats', err);
     }
   };
 
   useEffect(() => {
-    fetchStats();
+    const abortController = new AbortController();
+    fetchStats(abortController.signal);
+    
+    return () => {
+      abortController.abort(); // Cancel request on unmount
+    };
   }, []);
 
   const toggleSelectAll = () => {
@@ -185,8 +222,27 @@ export default function UsersPage() {
           : `User ${user.email} has been unfrozen`
       );
     } catch (err) {
+      const endpoint = user.isActive
+        ? ENDPOINTS.ADMIN_USERS.FREEZE(user.id)
+        : ENDPOINTS.ADMIN_USERS.UNFREEZE(user.id);
+      
       console.error('Failed to update user status', err);
-      toast.error(err?.response?.data?.message || 'Failed to update user status');
+      const errorMessage = err?.response?.data?.message || err?.message || 'Failed to update user status';
+      
+      // Handle 401 - token expired
+      if (err?.response?.status === 401) {
+        toast.error('Session expired. Please login again.');
+        // Redirect will be handled by API client interceptor
+        return;
+      }
+      
+      console.error('Error details:', {
+        status: err?.response?.status,
+        data: err?.response?.data,
+        endpoint: endpoint,
+        userId: user.id,
+      });
+      toast.error(errorMessage);
     }
   };
 

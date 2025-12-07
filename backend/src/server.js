@@ -8,8 +8,10 @@ import transactionRoutes from './routes/transactionRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
+import kycRoutes from './routes/kycRoutes.js';
 import { initAuth } from './controllers/authController.js';
 import { initTransactions } from './controllers/transactionController.js';
+import { initKYC } from './controllers/kycController.js';
 
 dotenv.config();
 
@@ -31,6 +33,7 @@ app.use('/api/transactions', transactionRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/kyc', kycRoutes);
 
 const PORT = process.env.PORT || 5001;
 
@@ -38,6 +41,7 @@ const startServer = async () => {
   await connectDB();
   await initAuth();
   await initTransactions();
+  await initKYC();
 
   app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);

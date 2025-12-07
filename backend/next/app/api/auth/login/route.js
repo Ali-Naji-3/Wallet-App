@@ -21,25 +21,58 @@ export async function POST(req) {
 
     const pool = getPool();
     
-    // 1. Find user by email
-    const [rows] = await pool.query(
-      `SELECT id, email, password_hash, full_name, base_currency, timezone, role, is_active
-       FROM users WHERE email = ? LIMIT 1`,
-      [email]
-    );
+    // 1. Find user by email (include suspension_reason if exists)
+    let userQuery = `SELECT id, email, password_hash, full_name, base_currency, timezone, role, is_active`;
+    
+    // Check if suspension_reason column exists
+    try {
+      const [cols] = await pool.query(`SHOW COLUMNS FROM users LIKE 'suspension_reason'`);
+      if (cols.length > 0) {
+        userQuery += `, suspension_reason`;
+      }
+    } catch (colErr) {
+      // Column doesn't exist, continue without it
+    }
+    
+    userQuery += ` FROM users WHERE email = ? LIMIT 1`;
+    
+    const [rows] = await pool.query(userQuery, [email]);
     
     const user = rows[0];
     if (!user) {
+      console.log(`[Login] User not found for email: ${email}`);
+      return NextResponse.json(
+        { message: 'Invalid credentials' },
+        { status: 401 }
+      );
+    }
+    
+    console.log(`[Login] User found: ID=${user.id}, Email=${user.email}, Role=${user.role}`);
+    
+    // SECURITY: Verify the email matches (prevent email injection)
+    if (user.email.toLowerCase() !== email.toLowerCase()) {
+      console.error(`[Login] SECURITY WARNING: Email mismatch! Query: ${email}, Found: ${user.email}`);
       return NextResponse.json(
         { message: 'Invalid credentials' },
         { status: 401 }
       );
     }
 
-    // Check if user is active
+    // Check if user account is suspended/frozen
     if (!user.is_active) {
+      // Professional message for suspended accounts
+      const suspensionReason = user.suspension_reason || null;
+      
       return NextResponse.json(
-        { message: 'Account is frozen. Please contact support.' },
+        { 
+          message: 'Account Suspended',
+          error: 'ACCESS_DENIED',
+          details: suspensionReason 
+            ? `Your account has been suspended. Reason: ${suspensionReason}`
+            : 'Your account has been suspended. Please contact support for assistance.',
+          contactSupport: true,
+          code: 'ACCOUNT_SUSPENDED'
+        },
         { status: 403 }
       );
     }
@@ -63,13 +96,14 @@ export async function POST(req) {
       {
         id: user.id,
         email: user.email,
+        role: user.role || 'user',
       },
       secret,
       { expiresIn: '1d' } // Token expires in 1 day
     );
 
     // 4. Return token and user info
-    return NextResponse.json({
+    const responseData = {
       token,
       user: {
         id: user.id,
@@ -80,7 +114,11 @@ export async function POST(req) {
         role: user.role || 'user',
         isActive: !!user.is_active,
       },
-    });
+    };
+    
+    console.log(`[Login] Returning user data: Email=${responseData.user.email}, Role=${responseData.user.role}`);
+    
+    return NextResponse.json(responseData);
   } catch (err) {
     console.error('Login error:', err);
     return NextResponse.json(
