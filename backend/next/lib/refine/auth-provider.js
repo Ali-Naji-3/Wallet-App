@@ -54,7 +54,7 @@ export const authProvider = {
       
       console.log('[Auth] Login successful:', data.user.email, 'Role:', data.user.role);
       storeAuthData(data.token, data.user);
-      
+
       return {
         success: true,
         redirectTo: data.user.role === 'admin' ? '/admin/dashboard' : '/wallet/dashboard',

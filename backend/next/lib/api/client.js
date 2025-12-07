@@ -61,7 +61,7 @@ apiClient.interceptors.response.use(
         
         // Only log warning if not on login page (expected 401s on login page)
         if (!isOnLoginPage) {
-          console.warn('[API Client] 401 Unauthorized - clearing token and redirecting to login');
+        console.warn('[API Client] 401 Unauthorized - clearing token and redirecting to login');
         }
         
         clearAuthData();

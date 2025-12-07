@@ -150,11 +150,21 @@ export default function KYCPage() {
     
     setProcessing(true);
     try {
-      await apiClient.post(`/api/admin/kyc/${selectedKYC.id}/reject`, { 
+      const response = await apiClient.post(`/api/admin/kyc/${selectedKYC.id}/reject`, { 
         rejectionReason, 
-        notes: adminNotes 
+        notes: adminNotes,
+        suspendAccount: true // Explicitly enable auto-suspension
       });
-      toast.success('KYC verification rejected');
+      
+      // Show appropriate message based on suspension
+      if (response.data?.userSuspended) {
+        toast.success(`KYC rejected and account suspended: ${response.data.userEmail}`);
+      } else if (response.data?.userRole === 'admin') {
+        toast.success('KYC rejected (admin account protected from suspension)');
+      } else {
+        toast.success('KYC verification rejected');
+      }
+      
       setRejectModal(false);
       setReviewModal(false);
       setRejectionReason('');

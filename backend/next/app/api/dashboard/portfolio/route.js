@@ -12,21 +12,21 @@ const getCachedPortfolio = unstable_cache(
     const [userRows, wallets, fxRates, txStats] = await Promise.all([
       // Get user base currency
       pool.query(
-        `SELECT base_currency FROM users WHERE id = ? LIMIT 1`,
+      `SELECT base_currency FROM users WHERE id = ? LIMIT 1`,
         [userId]
       ),
-      // Get user wallets
+    // Get user wallets
       pool.query(
-        `SELECT id, currency_code, balance, status
-         FROM wallets
-         WHERE user_id = ?
-         ORDER BY id DESC`,
+      `SELECT id, currency_code, balance, status
+       FROM wallets
+       WHERE user_id = ?
+       ORDER BY id DESC`,
         [userId]
       ),
       // Get latest FX rates (will get base currency from first query result)
       pool.query(
-        `SELECT quote_currency, rate
-         FROM fx_rates
+      `SELECT quote_currency, rate
+       FROM fx_rates
          WHERE base_currency = (SELECT base_currency FROM users WHERE id = ? LIMIT 1)
          AND fetched_at = (
            SELECT MAX(fetched_at) 
@@ -34,7 +34,7 @@ const getCachedPortfolio = unstable_cache(
            WHERE base_currency = (SELECT base_currency FROM users WHERE id = ? LIMIT 1)
          )
          ORDER BY quote_currency ASC
-         LIMIT 50`,
+       LIMIT 50`,
         [userId, userId]
       ),
       // Get transaction stats

@@ -122,6 +122,12 @@ export default function UsersPage() {
       ) {
         return; // Silently ignore aborted/cancelled requests
       }
+      
+      // Don't log 401 errors (token expired - will be handled by interceptor)
+      if (err?.response?.status === 401) {
+        return; // Silently ignore - redirect will happen via interceptor
+      }
+      
       console.error('Failed to fetch users', err);
       setError(err?.response?.data?.message || 'Failed to load users');
     } finally {
