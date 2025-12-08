@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useGetIdentity, useLogout, useIsAuthenticated } from '@refinedev/core';
@@ -9,6 +9,7 @@ import { clearAuthData } from '@/lib/auth/storage';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import ThemeToggle from '@/components/ThemeToggle';
+import UserNotificationBell from '@/components/UserNotificationBell';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,7 +28,6 @@ import {
   Menu,
   X,
   LogOut,
-  Bell,
   Wallet,
   ChevronDown,
   CreditCard,
@@ -54,16 +54,19 @@ export default function WalletLayout({ children }) {
   const { data: authData, isLoading: authLoading } = useIsAuthenticated();
   const { mutate: logout } = useLogout();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const hasRedirectedRef = useRef(false);
   
-  // SECURITY: Redirect to login if not authenticated
+  // SECURITY: Redirect to login if not authenticated (only once)
   useEffect(() => {
-    if (!authLoading && !authData?.authenticated) {
+    if (!authLoading && !authData?.authenticated && !hasRedirectedRef.current) {
+      hasRedirectedRef.current = true;
       console.log('[Wallet Layout] Not authenticated - redirecting to login');
       // Clear any stale data
       clearAuthData();
-      router.replace('/login');
+      // Use window.location for immediate redirect, bypassing React navigation
+      window.location.href = '/login';
     }
-  }, [authData, authLoading, router]);
+  }, [authData, authLoading]);
   
   // Show loading while checking auth
   if (authLoading || identityLoading) {
@@ -157,11 +160,8 @@ export default function WalletLayout({ children }) {
               {/* Theme Toggle */}
               <ThemeToggle />
               
-              {/* Notifications */}
-              <Button variant="ghost" size="icon" className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white relative">
-                <Bell className="h-5 w-5" />
-                <span className="absolute top-1 right-1 h-2 w-2 bg-emerald-500 rounded-full"></span>
-              </Button>
+              {/* Real-time Notifications */}
+              <UserNotificationBell />
 
               {/* User Menu */}
               <DropdownMenu>

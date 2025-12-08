@@ -18,7 +18,7 @@ export async function GET(req) {
 
     const pool = getPool();
     const [rows] = await pool.query(
-      `SELECT id, user_id, title, body, is_read, created_at
+      `SELECT id, user_id, type, title, body, is_read, created_at
        FROM notifications
        WHERE user_id = ?
        ORDER BY created_at DESC

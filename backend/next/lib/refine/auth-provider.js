@@ -34,6 +34,7 @@ const fetchAndStoreUser = async () => {
 export const authProvider = {
   login: async ({ email, password }) => {
     try {
+      // Clear old data BEFORE making request
       clearAuthData();
       if (typeof window !== 'undefined') sessionStorage.clear();
       
@@ -45,15 +46,20 @@ export const authProvider = {
         return { success: false, error: { name: 'LoginError', message: 'Invalid email or password' } };
       }
 
-      // Verify email matches
-      if (data.user?.email !== email) {
+      // Verify email matches (case-insensitive)
+      if (data.user?.email?.toLowerCase() !== email.toLowerCase()) {
         console.error('[Auth] Email mismatch!', { loginEmail: email, returnedEmail: data.user.email });
         clearAuthData();
         return { success: false, error: { name: 'LoginError', message: 'Authentication error: User data mismatch' } };
       }
       
       console.log('[Auth] Login successful:', data.user.email, 'Role:', data.user.role);
+      
+      // Store auth data SYNCHRONOUSLY before returning success
       storeAuthData(data.token, data.user);
+      
+      // Small delay to ensure localStorage is written before navigation
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       return {
         success: true,
@@ -61,6 +67,7 @@ export const authProvider = {
         user: data.user,
       };
     } catch (error) {
+      clearAuthData();
       return { success: false, error: getErrorData(error) };
     }
   },
@@ -75,9 +82,24 @@ export const authProvider = {
     if (!token) return { authenticated: false, redirectTo: '/login' };
 
     try {
+      // Quick timeout to prevent blocking
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+    try {
       await fetchAndStoreUser();
+      } finally {
+        clearTimeout(timeoutId);
+      }
+      
       return { authenticated: true };
     } catch (error) {
+      // Don't clear auth on timeout/abort - might just be slow network
+      if (error.code === 'ECONNABORTED' || error.name === 'AbortError' || error.message?.includes('timeout')) {
+        // Still authenticated if we have a token, just couldn't verify
+        return { authenticated: true };
+      }
+      
       clearAuthData();
       const isSuspended = isSuspendedError(error);
       
@@ -115,7 +137,13 @@ export const authProvider = {
     if (!token) return null;
     
     try {
-      const user = await fetchAndStoreUser();
+      // Add timeout wrapper
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Identity fetch timeout')), 8000)
+      );
+      
+      const user = await Promise.race([fetchAndStoreUser(), timeoutPromise]);
+      
       if (!user?.email) {
         console.error('[Auth] Invalid user data');
         clearAuthData();
@@ -131,6 +159,10 @@ export const authProvider = {
         role: user.role,
       };
     } catch (error) {
+      // Ignore timeout/aborted errors silently (component may have unmounted)
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout') || error.message?.includes('aborted')) {
+        return null; // Return null instead of clearing auth to avoid disrupting navigation
+      }
       // Don't log 401 errors (token expired - expected)
       if (error.response?.status !== 401) {
         console.error('[Auth] Error getting identity:', error);

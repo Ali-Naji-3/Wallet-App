@@ -34,6 +34,9 @@ export function getPool() {
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
+    connectTimeout: 5000, // 5 second connection timeout
+    acquireTimeout: 5000, // 5 second acquire timeout
+    timeout: 5000, // 5 second query timeout
   });
   return pool;
 }

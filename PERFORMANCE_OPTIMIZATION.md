@@ -64,3 +64,6 @@ mysql -u your_user -p fxwallet < backend/database/add-indexes.sql
 - Real-time updates: ~50% less bandwidth
 
 
+
+
+

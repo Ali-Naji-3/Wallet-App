@@ -4,10 +4,10 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import apiClient from '@/lib/api/client';
 
 /**
- * Custom hook for real-time notifications using Server-Sent Events (SSE)
- * Automatically reconnects on disconnect and handles errors gracefully
+ * Custom hook for REGULAR USER real-time notifications using SSE
+ * Works for wallet users (not just admins)
  */
-export function useNotifications(options = {}) {
+export function useUserNotifications(options = {}) {
   const { 
     enabled = true,
     onNewNotification,
@@ -30,11 +30,14 @@ export function useNotifications(options = {}) {
   // Fetch initial notifications
   const fetchInitialNotifications = useCallback(async () => {
     try {
-      const { data } = await apiClient.get('/api/admin/notifications', {
+      const { data } = await apiClient.get('/api/notifications/my', {
         timeout: 5000, // 5 second timeout
       });
       setNotifications(data.notifications || []);
-      setUnreadCount(data.unreadCount || 0);
+      
+      // Count unread
+      const unread = (data.notifications || []).filter(n => !n.is_read).length;
+      setUnreadCount(unread);
       setLoading(false);
     } catch (err) {
       // Ignore timeout/abort errors - SSE will provide data
@@ -42,7 +45,7 @@ export function useNotifications(options = {}) {
         setLoading(false);
         return;
       }
-      console.error('[useNotifications] Error fetching initial notifications:', err);
+      console.error('[useUserNotifications] Error:', err);
       setError(err.message);
       setLoading(false);
       if (onError) onError(err);
@@ -55,11 +58,10 @@ export function useNotifications(options = {}) {
     
     // Prevent multiple simultaneous connection attempts
     if (isConnectingRef.current) {
-      console.log('[useNotifications] Connection already in progress, skipping');
+      console.log('[useUserNotifications] Connection already in progress, skipping');
       return;
     }
     
-    // Clean up existing connection
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
       eventSourceRef.current = null;
@@ -69,122 +71,112 @@ export function useNotifications(options = {}) {
     
     const token = localStorage.getItem('fxwallet_token');
     if (!token) {
-      console.warn('[useNotifications] No token found, skipping SSE connection');
+      console.warn('[useUserNotifications] No token found');
       isConnectingRef.current = false;
       return;
     }
     
     try {
-      // Create EventSource with token in query param (SSE doesn't support custom headers easily)
-      const url = new URL('/api/admin/notifications/stream', window.location.origin);
+      const url = new URL('/api/notifications/stream', window.location.origin);
       url.searchParams.set('token', token);
       
       const eventSource = new EventSource(url.toString());
       eventSourceRef.current = eventSource;
       
-        eventSource.onopen = () => {
-          console.log('[useNotifications] SSE connection opened');
-          setConnected(true);
-          setError(null);
-          reconnectAttempts.current = 0;
-          isConnectingRef.current = false;
-        };
+      eventSource.onopen = () => {
+        console.log('[useUserNotifications] ✅ SSE connected');
+        setConnected(true);
+        setError(null);
+        reconnectAttempts.current = 0;
+        isConnectingRef.current = false;
+      };
       
-          eventSource.onmessage = (event) => {
-            try {
-              const data = JSON.parse(event.data);
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          
+          switch (data.type) {
+            case 'connected':
+              console.log('[useUserNotifications]', data.message);
+              break;
               
-              switch (data.type) {
-                case 'connected':
-                  console.log('[useNotifications] Connected:', data.message);
-                  break;
-                  
-                case 'initial':
-                  // Initial data from SSE - use it immediately
-                  if (data.notifications) {
-                    setNotifications(data.notifications);
-                    setLoading(false);
-                  }
-                  setUnreadCount(data.unreadCount || 0);
-                  break;
+            case 'initial':
+              // Initial data from SSE - use it immediately
+              if (data.notifications) {
+                setNotifications(data.notifications);
+                setLoading(false);
+              }
+              setUnreadCount(data.unreadCount || 0);
+              break;
               
             case 'new_notifications':
-              // Add new notifications to the list
+              console.log('[useUserNotifications] 🔔 New notifications:', data.notifications.length);
+              
+              // Add new notifications
               setNotifications(prev => {
-                // Avoid duplicates
                 const existingIds = new Set(prev.map(n => n.id));
                 const newOnes = data.notifications.filter(n => !existingIds.has(n.id));
-                return [...newOnes, ...prev].slice(0, 50); // Keep latest 50
+                return [...newOnes, ...prev].slice(0, 50);
               });
               
               setUnreadCount(data.unreadCount || 0);
               
-              // Call callback if provided
+              // Trigger callback for each new notification
               if (onNewNotification && data.notifications.length > 0) {
                 data.notifications.forEach(notif => onNewNotification(notif));
               }
               break;
               
             case 'heartbeat':
-              // Connection is alive
+              // Connection alive
               break;
               
             case 'error':
-              console.error('[useNotifications] SSE error:', data.message);
+              console.error('[useUserNotifications] Error:', data.message);
               setError(data.message);
-              if (onError) onError(new Error(data.message));
-              
-              // Close on auth errors
               if (data.code === 'UNAUTHORIZED') {
                 eventSource.close();
               }
               break;
-              
-            default:
-              console.log('[useNotifications] Unknown message type:', data.type);
           }
         } catch (err) {
-          console.error('[useNotifications] Error parsing SSE message:', err);
+          console.error('[useUserNotifications] Parse error:', err);
         }
       };
       
       eventSource.onerror = (err) => {
-        console.error('[useNotifications] SSE connection error:', err);
+        console.error('[useUserNotifications] Connection error');
         setConnected(false);
         isConnectingRef.current = false;
         
         // Don't reconnect if component is unmounted
         if (!mountedRef.current) {
-          console.log('[useNotifications] Component unmounted, not reconnecting');
+          console.log('[useUserNotifications] Component unmounted, not reconnecting');
           return;
         }
         
-        // Attempt to reconnect
+        // Auto-reconnect with exponential backoff
         if (reconnectAttempts.current < maxReconnectAttempts) {
           reconnectAttempts.current += 1;
-          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000); // Exponential backoff, max 30s
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000);
           
-          console.log(`[useNotifications] Reconnecting in ${delay}ms (attempt ${reconnectAttempts.current}/${maxReconnectAttempts})`);
+          console.log(`[useUserNotifications] Reconnecting in ${delay}ms (${reconnectAttempts.current}/${maxReconnectAttempts})`);
           
           reconnectTimeoutRef.current = setTimeout(() => {
             connect();
           }, delay);
-        } else {
-          console.error('[useNotifications] Max reconnect attempts reached');
-          setError('Connection lost. Please refresh the page.');
-          if (onError) onError(new Error('Connection lost'));
         }
       };
       
-      } catch (err) {
-        console.error('[useNotifications] Error creating EventSource:', err);
-        setError(err.message);
-        isConnectingRef.current = false;
-        if (onError) onError(err);
-      }
-    }, [enabled, onNewNotification, onError]);
+    } catch (err) {
+      console.error('[useUserNotifications] Connection error:', err);
+      setError(err.message);
+      isConnectingRef.current = false;
+      if (onError) onError(err);
+    }
+  }, [enabled, onNewNotification, onError]);
   
-  // Disconnect from SSE stream
+  // Disconnect
   const disconnect = useCallback(() => {
     isConnectingRef.current = false;
     if (eventSourceRef.current) {
@@ -198,16 +190,16 @@ export function useNotifications(options = {}) {
     setConnected(false);
   }, []);
   
-  // Mark notification as read
+  // Mark as read
   const markAsRead = useCallback(async (notificationId) => {
     try {
-      await apiClient.post('/api/admin/notifications', { notificationId });
+      await apiClient.post(`/api/notifications/${notificationId}/read`);
       setNotifications(prev =>
         prev.map(n => n.id === notificationId ? { ...n, is_read: 1 } : n)
       );
       setUnreadCount(prev => Math.max(0, prev - 1));
     } catch (err) {
-      console.error('[useNotifications] Error marking as read:', err);
+      console.error('[useUserNotifications] Error marking as read:', err);
       throw err;
     }
   }, []);
@@ -215,16 +207,16 @@ export function useNotifications(options = {}) {
   // Mark all as read
   const markAllAsRead = useCallback(async () => {
     try {
-      await apiClient.post('/api/admin/notifications', { markAllRead: true });
+      await apiClient.post('/api/notifications/mark-all-read');
       setNotifications(prev => prev.map(n => ({ ...n, is_read: 1 })));
       setUnreadCount(0);
     } catch (err) {
-      console.error('[useNotifications] Error marking all as read:', err);
+      console.error('[useUserNotifications] Error marking all as read:', err);
       throw err;
     }
   }, []);
   
-  // Refresh notifications manually
+  // Refresh
   const refresh = useCallback(async () => {
     await fetchInitialNotifications();
   }, [fetchInitialNotifications]);
@@ -258,7 +250,7 @@ export function useNotifications(options = {}) {
       clearTimeout(fetchTimeout);
       disconnect();
     };
-  }, [enabled]); // Only depend on enabled, not the functions
+  }, [enabled]); // Only depend on enabled
   
   return {
     notifications,
@@ -272,7 +264,4 @@ export function useNotifications(options = {}) {
     reconnect: connect,
   };
 }
-
-
-
 

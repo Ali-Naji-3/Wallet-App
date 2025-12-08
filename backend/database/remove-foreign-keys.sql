@@ -16,3 +16,6 @@ ALTER TABLE kyc_verifications DROP FOREIGN KEY IF EXISTS kyc_verifications_ibfk_
 
 SELECT 'Foreign keys removed for performance (except notifications)' AS status;
 
+
+
+

@@ -1,40 +1,25 @@
 import { NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
 import { parseBearer, verifyToken } from '@/lib/auth';
-import { requireAdmin } from '@/lib/admin';
 
 /**
- * Server-Sent Events (SSE) endpoint for real-time notifications
- * This allows the client to receive notifications instantly without polling
- * Note: EventSource doesn't support custom headers, so we use query param for token
+ * Server-Sent Events (SSE) endpoint for real-time USER notifications
+ * For regular users to get instant KYC, transaction notifications
  */
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
-
 export async function GET(req) {
-  // Create a readable stream for SSE
   const stream = new ReadableStream({
     async start(controller) {
       const encoder = new TextEncoder();
-      let closed = false;
       
-      // Helper to send SSE message
       const send = (data) => {
-        if (closed) return;
-        try {
-          const message = `data: ${JSON.stringify(data)}\n\n`;
-          controller.enqueue(encoder.encode(message));
-        } catch (err) {
-          console.error('[SSE Admin] Error sending message:', err);
-          closed = true;
-        }
+        const message = `data: ${JSON.stringify(data)}\n\n`;
+        controller.enqueue(encoder.encode(message));
       };
       
-      // Send initial connection message
       send({ type: 'connected', message: 'Connected to notification stream' });
       
       try {
-        // Get token from query params (EventSource doesn't support custom headers)
+        // Get token from query params
         const url = new URL(req.url);
         const token = url.searchParams.get('token') || parseBearer(req.headers.get('authorization') || undefined);
         
@@ -44,12 +29,12 @@ export async function GET(req) {
           return;
         }
         
-        // Authenticate admin
-        let adminUser;
+        // Verify token
+        let user;
         try {
-          adminUser = await requireAdmin(token);
+          user = verifyToken(token);
         } catch (authError) {
-          send({ type: 'error', message: authError.message || 'Unauthorized', code: 'UNAUTHORIZED' });
+          send({ type: 'error', message: 'Invalid token', code: 'UNAUTHORIZED' });
           setTimeout(() => controller.close(), 1000);
           return;
         }
@@ -63,21 +48,21 @@ export async function GET(req) {
            WHERE user_id = ?
            ORDER BY created_at DESC
            LIMIT 20`,
-          [adminUser.id]
+          [user.id]
         );
         
         const [unreadCount] = await pool.query(
           `SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND is_read = 0`,
-          [adminUser.id]
+          [user.id]
         );
         
         send({ 
-          type: 'initial', 
+          type: 'initial',
           notifications: initialNotifications,
           unreadCount: unreadCount[0]?.count || 0 
         });
         
-        // Poll database for new notifications every 2 seconds for instant updates
+        // Check for new notifications every 1 second (faster than admin - 2s)
         let lastCheck = Date.now();
         const checkInterval = setInterval(async () => {
           try {
@@ -88,39 +73,30 @@ export async function GET(req) {
                WHERE user_id = ? AND created_at > FROM_UNIXTIME(? / 1000)
                ORDER BY created_at DESC
                LIMIT 10`,
-              [adminUser.id, lastCheck]
+              [user.id, lastCheck]
             );
             
-            // Only send heartbeat if no new notifications (reduce bandwidth)
             if (newNotifications.length > 0) {
-              // Get updated unread count only when there are new notifications
-              const [unreadCount] = await pool.query(
+              // Get updated unread count
+              const [unreadCountResult] = await pool.query(
                 `SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND is_read = 0`,
-                [adminUser.id]
+                [user.id]
               );
               
               send({
                 type: 'new_notifications',
                 notifications: newNotifications,
-                unreadCount: unreadCount[0]?.count || 0,
+                unreadCount: unreadCountResult[0]?.count || 0,
               });
               
-              // Update last check time
               lastCheck = Date.now();
-            } else {
-              // Send heartbeat only every 10 seconds to reduce overhead
-              if (Date.now() - lastCheck > 10000) {
-                send({ type: 'heartbeat', timestamp: Date.now() });
-              }
             }
-            
           } catch (error) {
-            console.error('[SSE] Error checking notifications:', error);
-            send({ type: 'error', message: 'Error checking notifications' });
+            console.error('[SSE User] Error checking notifications:', error);
           }
-        }, 1000); // Check every 1 second for instant notifications
+        }, 1000); // Check every 1 second for instant updates
         
-        // Cleanup on client disconnect
+        // Cleanup on disconnect
             req.signal.addEventListener('abort', () => {
               closed = true;
               clearInterval(checkInterval);
@@ -132,28 +108,23 @@ export async function GET(req) {
             });
         
       } catch (error) {
-        console.error('[SSE] Authentication error:', error);
+        console.error('[SSE User] Error:', error);
         send({ 
           type: 'error', 
-          message: error.message || 'Authentication failed',
-          code: error.message.includes('Unauthorized') ? 'UNAUTHORIZED' : 'ERROR'
+          message: error.message || 'Server error',
+          code: 'ERROR'
         });
-        
-        // Close connection after error
-        setTimeout(() => {
-          controller.close();
-        }, 1000);
+        setTimeout(() => controller.close(), 1000);
       }
     },
   });
   
-  // Return SSE response
   return new NextResponse(stream, {
     headers: {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache, no-transform',
       'Connection': 'keep-alive',
-      'X-Accel-Buffering': 'no', // Disable buffering in nginx
+      'X-Accel-Buffering': 'no',
     },
   });
 }

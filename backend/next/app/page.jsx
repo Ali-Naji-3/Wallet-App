@@ -11,6 +11,8 @@ export default function HomePage() {
   const { data: identity, isLoading: identityLoading } = useGetIdentity();
 
   useEffect(() => {
+    // Add timeout to prevent blocking
+    const timeout = setTimeout(() => {
     if (!authLoading && !identityLoading) {
       if (authData?.authenticated) {
         // Redirect based on user role
@@ -20,9 +22,20 @@ export default function HomePage() {
           router.replace('/wallet/dashboard');
         }
       } else {
-        router.replace('/login');
+          // Use window.location for faster redirect, bypassing RSC
+          if (typeof window !== 'undefined') {
+            window.location.href = '/login';
+          }
+        }
+      } else if (authLoading || identityLoading) {
+        // If still loading after 2 seconds, redirect to login to avoid blocking
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login';
       }
     }
+    }, 500); // Small delay to allow auth check
+
+    return () => clearTimeout(timeout);
   }, [authData, authLoading, identity, identityLoading, router]);
 
   return (

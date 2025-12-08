@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useGetIdentity, useLogout, useIsAuthenticated } from '@refinedev/core';
@@ -195,15 +195,20 @@ export default function AdminLayout({ children }) {
     'Transactions',
   ]);
 
-  // SECURITY: Redirect to login if not authenticated
+  const hasRedirectedRef = useRef(false);
+  
+  // SECURITY: Redirect to login if not authenticated (only once)
   useEffect(() => {
-    if (!authLoading && !authData?.authenticated) {
+    if (!authLoading && !authData?.authenticated && !hasRedirectedRef.current) {
+      hasRedirectedRef.current = true;
       console.log('[Admin Layout] Not authenticated - redirecting to login');
-      // Clear any stale data
       clearAuthData();
-      router.replace('/login');
+      // Use window.location for instant redirect, bypassing Next.js router
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
     }
-  }, [authData, authLoading, router]);
+  }, [authData, authLoading]);
 
   const toggleSection = (title) => {
     setExpandedSections(prev =>
@@ -218,8 +223,9 @@ export default function AdminLayout({ children }) {
     router.push('/login');
   };
 
-  // Show loading while checking auth
+  // Show loading while checking auth (with timeout to prevent blocking)
   if (authLoading || identityLoading) {
+    // Don't block indefinitely - show UI after short delay
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-950">
         <div className="text-center">

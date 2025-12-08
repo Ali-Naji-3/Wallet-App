@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Link from 'next/link';
 import {
   Wallet,
@@ -20,7 +21,10 @@ import {
   EyeOff,
   Sparkles,
   ChevronRight,
+  BarChart3,
+  Home,
 } from 'lucide-react';
+import TransactionAnalytics from '@/components/TransactionAnalytics';
 
 const walletBalances = [
   { 
@@ -90,6 +94,7 @@ export default function WalletDashboard() {
   const [balanceVisible, setBalanceVisible] = useState(true);
   const [heroCardIndex, setHeroCardIndex] = useState(0); // Index of card in hero position
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
   
   // Calculate total balance in USD
   const totalBalance = walletBalances.reduce((sum, w) => {
@@ -117,7 +122,19 @@ export default function WalletDashboard() {
   const carouselCards = walletBalances.filter((_, index) => index !== heroCardIndex);
 
   return (
-    <div className="space-y-8">
+    <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+      <TabsList className="bg-white dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 p-1">
+        <TabsTrigger value="overview" className="flex items-center gap-2">
+          <Home className="h-4 w-4" />
+          Overview
+        </TabsTrigger>
+        <TabsTrigger value="analytics" className="flex items-center gap-2">
+          <BarChart3 className="h-4 w-4" />
+          Analytics
+        </TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="overview" className="space-y-8">
       {/* Welcome Section */}
       <div className="flex items-center justify-between">
         <div>
@@ -577,7 +594,13 @@ export default function WalletDashboard() {
           </div>
         </CardContent>
       </Card>
-    </div>
+      </TabsContent>
+
+      {/* Analytics Tab */}
+      <TabsContent value="analytics" className="space-y-6">
+        <TransactionAnalytics transactions={recentTransactions} />
+      </TabsContent>
+    </Tabs>
   );
 }
 

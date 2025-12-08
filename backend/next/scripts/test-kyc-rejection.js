@@ -25,13 +25,13 @@ async function testKYCRejection() {
     // Step 1: Check if test user exists
     const [existingUsers] = await pool.query(
       'SELECT id, email, is_active, role FROM users WHERE email = ?',
-      ['ali@gmail.com']
+      ['testuser@example.com']
     );
 
     let userId;
     if (existingUsers.length > 0) {
       userId = existingUsers[0].id;
-      console.log(`✅ Test user found: ali@gmail.com (ID: ${userId})`);
+      console.log(`✅ Test user found: testuser@example.com (ID: ${userId})`);
       console.log(`   Current status: ${existingUsers[0].is_active ? 'ACTIVE' : 'SUSPENDED'}`);
       
       // Ensure user is active for testing
@@ -45,10 +45,10 @@ async function testKYCRejection() {
       const [result] = await pool.query(
         `INSERT INTO users (email, password_hash, full_name, role, is_active, is_verified)
          VALUES (?, ?, ?, 'user', 1, 0)`,
-        ['ali@gmail.com', passwordHash, 'Ali Test User']
+        ['testuser@example.com', passwordHash, 'Test User']
       );
       userId = result.insertId;
-      console.log(`✅ Test user created: ali@gmail.com (ID: ${userId})`);
+      console.log(`✅ Test user created: testuser@example.com (ID: ${userId})`);
     }
 
     // Step 2: Check if KYC table exists and create test KYC
@@ -146,7 +146,7 @@ async function testKYCRejection() {
 
       console.log(`\n🎉 Test completed!`);
       console.log(`\n📝 Summary:`);
-      console.log(`   - User: ali@gmail.com (ID: ${userId})`);
+      console.log(`   - User: testuser@example.com (ID: ${userId})`);
       console.log(`   - KYC: Rejected (ID: ${kycId})`);
       console.log(`   - Account Status: ${afterUser[0].is_active ? 'ACTIVE ❌' : 'SUSPENDED ✅'}`);
       console.log(`   - Auto-suspension: ENABLED ✅`);

@@ -6,7 +6,6 @@ import dataProvider from '@/lib/refine/data-provider';
 import { authProvider } from '@/lib/refine/auth-provider';
 import { accessControlProvider } from '@/lib/refine/access-control';
 import { ThemeProvider } from '@/contexts/ThemeContext';
-import { queryConfigs } from '@/lib/react-query-config';
 
 export default function RefineProvider({ children }) {
   return (
@@ -50,7 +49,8 @@ export default function RefineProvider({ children }) {
       options={{
         syncWithLocation: true,
         warnWhenUnsavedChanges: false, // Disable to improve performance
-        projectId: 'fxwallet-admin',
+        // Disable telemetry to prevent OpaqueResponseBlocking errors
+        // projectId: 'fxwallet-admin', // Commented out to disable telemetry
         reactQuery: {
           devtoolConfig: false, // Disable devtools in production
           // OPTIMIZATION: Configure React Query caching

@@ -63,15 +63,18 @@ export default function LoginPage() {
         onSuccess: (data) => {
           toast.success('Login successful!');
           
-          // Redirect based on role from FRESH login response only
-          // Never use cached localStorage here as it could be stale
+          // Get role from fresh login response
           const role = data?.user?.role;
           
+          // Use window.location for FASTER redirect (bypasses RSC fetch issues)
+          // Small delay ensures localStorage is written
+          setTimeout(() => {
           if (role === 'admin') {
-            router.push('/admin/dashboard');
+              window.location.href = '/admin/dashboard';
           } else {
-            router.push('/wallet/dashboard');
+              window.location.href = '/wallet/dashboard';
           }
+          }, 100);
         },
         onError: (err) => {
           // Check if account is suspended (multiple ways to detect)
@@ -128,11 +131,14 @@ export default function LoginPage() {
         {
           onSuccess: (loginData) => {
             const role = loginData?.user?.role || data?.user?.role || 'user';
+            // Use window.location for FASTER redirect (bypasses RSC issues)
+            setTimeout(() => {
             if (role === 'admin') {
-              router.push('/admin/dashboard');
+                window.location.href = '/admin/dashboard';
             } else {
-              router.push('/wallet/dashboard');
+                window.location.href = '/wallet/dashboard';
             }
+            }, 100);
           },
           onError: () => {
             // If auto-login fails, fallback to login page with prefilled email
