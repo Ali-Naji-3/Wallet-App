@@ -112,6 +112,20 @@ export function useUserNotifications(options = {}) {
             case 'new_notifications':
               console.log('[useUserNotifications] 🔔 New notifications:', data.notifications.length);
               
+              // Check for suspension notifications FIRST
+              const suspensionNotif = data.notifications.find(
+                n => n.type === 'kyc_rejected' && (n.title?.includes('Account Suspended') || n.body?.includes('account has been suspended'))
+              );
+              
+              if (suspensionNotif) {
+                // Handle suspension immediately - process this notification first
+                if (onNewNotification) {
+                  onNewNotification(suspensionNotif);
+                }
+                // Don't process other notifications if account is suspended
+                return;
+              }
+              
               // Add new notifications
               setNotifications(prev => {
                 const existingIds = new Set(prev.map(n => n.id));
@@ -193,7 +207,7 @@ export function useUserNotifications(options = {}) {
   // Mark as read
   const markAsRead = useCallback(async (notificationId) => {
     try {
-      await apiClient.post(`/api/notifications/${notificationId}/read`);
+      await apiClient.post('/api/notifications/my', { notificationId });
       setNotifications(prev =>
         prev.map(n => n.id === notificationId ? { ...n, is_read: 1 } : n)
       );
@@ -207,11 +221,35 @@ export function useUserNotifications(options = {}) {
   // Mark all as read
   const markAllAsRead = useCallback(async () => {
     try {
-      await apiClient.post('/api/notifications/mark-all-read');
+      await apiClient.post('/api/notifications/my', { markAllRead: true });
       setNotifications(prev => prev.map(n => ({ ...n, is_read: 1 })));
       setUnreadCount(0);
     } catch (err) {
       console.error('[useUserNotifications] Error marking all as read:', err);
+      throw err;
+    }
+  }, []);
+
+  // Delete single notification
+  const deleteNotification = useCallback(async (notificationId) => {
+    try {
+      await apiClient.delete(`/api/notifications/my?id=${notificationId}`);
+      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    } catch (err) {
+      console.error('[useUserNotifications] Error deleting notification:', err);
+      throw err;
+    }
+  }, []);
+
+  // Clear all notifications
+  const clearAll = useCallback(async () => {
+    try {
+      await apiClient.delete('/api/notifications/my?clearAll=true');
+      setNotifications([]);
+      setUnreadCount(0);
+    } catch (err) {
+      console.error('[useUserNotifications] Error clearing all notifications:', err);
       throw err;
     }
   }, []);
@@ -260,6 +298,8 @@ export function useUserNotifications(options = {}) {
     error,
     markAsRead,
     markAllAsRead,
+    deleteNotification,
+    clearAll,
     refresh,
     reconnect: connect,
   };

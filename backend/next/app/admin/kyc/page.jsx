@@ -153,7 +153,7 @@ export default function KYCPage() {
       const response = await apiClient.post(`/api/admin/kyc/${selectedKYC.id}/reject`, { 
         rejectionReason, 
         notes: adminNotes,
-        suspendAccount: true // Explicitly enable auto-suspension
+        suspendAccount: true // ALWAYS suspend account on rejection - immediate action
       });
       
       // Show appropriate message based on suspension

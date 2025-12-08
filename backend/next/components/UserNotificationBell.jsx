@@ -9,12 +9,13 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import { Bell, CheckCheck, FileCheck, AlertCircle, Send, Download, RefreshCw, Shield, Volume2, VolumeX, Wifi, WifiOff, TrendingUp } from 'lucide-react';
+import { Bell, CheckCheck, FileCheck, AlertCircle, Send, Download, RefreshCw, Shield, Volume2, VolumeX, Wifi, WifiOff, TrendingUp, Trash2, X } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { useTheme } from '@/contexts/ThemeContext';
 import { toast } from 'sonner';
 import { useUserNotifications } from '@/hooks/useUserNotifications';
+import { clearAuthData } from '@/lib/auth/storage';
 
 export default function UserNotificationBell() {
   const { theme } = useTheme();
@@ -38,11 +39,36 @@ export default function UserNotificationBell() {
     error: connectionError,
     markAsRead: markNotificationAsRead,
     markAllAsRead: markAllNotificationsAsRead,
+    deleteNotification,
+    clearAll,
     refresh,
   } = useUserNotifications({
     enabled: true,
     onNewNotification: (notification) => {
-      // Show toast with action button
+      // IMMEDIATE ACTION: If account is suspended, log out immediately
+      if (notification.type === 'kyc_rejected' && notification.title?.includes('Account Suspended')) {
+        // Clear auth data immediately
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('fxwallet_token');
+          localStorage.removeItem('fxwallet_user');
+          sessionStorage.setItem('suspended_message', notification.body || 'Your account has been suspended due to KYC rejection.');
+          
+          // Show suspension message
+          toast.error('Account Suspended', {
+            description: notification.body || 'Your account has been suspended. Please contact support.',
+            duration: 10000,
+          });
+          
+          // Immediately redirect to login
+          setTimeout(() => {
+            window.location.href = '/login';
+          }, 500);
+          
+          return; // Don't show normal notification
+        }
+      }
+      
+      // Show toast with action button for normal notifications
       toast.success(notification.title, {
         description: notification.body,
         duration: 6000,
@@ -116,6 +142,31 @@ export default function UserNotificationBell() {
     } catch (error) {
       console.error('Error marking all as read:', error);
       toast.error('Failed to mark all as read');
+    }
+  };
+
+  const handleDelete = async (notificationId, e) => {
+    e.stopPropagation(); // Prevent notification click
+    try {
+      await deleteNotification(notificationId);
+      toast.success('Notification deleted');
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+      toast.error('Failed to delete notification');
+    }
+  };
+
+  const handleClearAll = async () => {
+    if (!confirm('Are you sure you want to clear all notifications? This action cannot be undone.')) {
+      return;
+    }
+    try {
+      await clearAll();
+      toast.success('All notifications cleared');
+      setOpen(false);
+    } catch (error) {
+      console.error('Error clearing notifications:', error);
+      toast.error('Failed to clear notifications');
     }
   };
 
@@ -293,36 +344,47 @@ export default function UserNotificationBell() {
           )}
         </div>
         
-        {notifications.length > 0 && (
-          <>
-            <DropdownMenuSeparator className={isDark ? 'bg-gray-800' : 'bg-gray-200'} />
-            <div className="p-3 space-y-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className={`w-full justify-center ${isDark ? 'border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300' : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700'}`}
-                onClick={() => {
-                  router.push('/wallet/kyc');
-                  setOpen(false);
-                }}
-              >
-                <Shield className="h-4 w-4 mr-2" />
-                Check KYC Status
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className={`w-full justify-center text-xs ${isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'}`}
-                onClick={() => {
-                  router.push('/wallet/transactions');
-                  setOpen(false);
-                }}
-              >
-                View Transactions
-              </Button>
-            </div>
-          </>
-        )}
+            {notifications.length > 0 && (
+              <>
+                <DropdownMenuSeparator className={isDark ? 'bg-gray-800' : 'bg-gray-200'} />
+                <div className="p-3 space-y-2">
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={`flex-1 justify-center ${isDark ? 'border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300' : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700'}`}
+                      onClick={() => {
+                        router.push('/wallet/kyc');
+                        setOpen(false);
+                      }}
+                    >
+                      <Shield className="h-4 w-4 mr-2" />
+                      Check KYC
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={`${isDark ? 'border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300' : 'border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700'}`}
+                      onClick={handleClearAll}
+                      title="Clear all notifications"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={`w-full justify-center text-xs ${isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'}`}
+                    onClick={() => {
+                      router.push('/wallet/transactions');
+                      setOpen(false);
+                    }}
+                  >
+                    View Transactions
+                  </Button>
+                </div>
+              </>
+            )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

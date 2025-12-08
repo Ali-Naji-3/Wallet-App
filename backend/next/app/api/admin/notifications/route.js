@@ -122,3 +122,57 @@ export async function POST(req) {
   }
 }
 
+export async function DELETE(req) {
+  try {
+    const authHeader = req.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+    
+    if (!token) {
+      return NextResponse.json({ message: 'No token provided' }, { status: 401 });
+    }
+    
+    const decoded = verifyToken(token);
+    if (!decoded) {
+      return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
+    }
+    
+    const pool = getPool();
+    
+    const { searchParams } = new URL(req.url);
+    const notificationId = searchParams.get('id');
+    const clearAll = searchParams.get('clearAll') === 'true';
+
+    if (clearAll) {
+      // Delete all notifications for this admin
+      await pool.query(
+        `DELETE FROM notifications WHERE user_id = ?`,
+        [decoded.id]
+      );
+      return NextResponse.json({ message: 'All notifications cleared' });
+    }
+
+    if (notificationId) {
+      // Delete single notification
+      const [result] = await pool.query(
+        `DELETE FROM notifications WHERE id = ? AND user_id = ?`,
+        [notificationId, decoded.id]
+      );
+      
+      if (result.affectedRows === 0) {
+        return NextResponse.json({ 
+          message: 'Notification not found',
+          error: 'NOT_FOUND'
+        }, { status: 404 });
+      }
+      
+      return NextResponse.json({ message: 'Notification deleted' });
+    }
+
+    return NextResponse.json({ message: 'Invalid request' }, { status: 400 });
+    
+  } catch (error) {
+    console.error('Error deleting notification:', error);
+    return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
+  }
+}
+

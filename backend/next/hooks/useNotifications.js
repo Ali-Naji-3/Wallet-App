@@ -223,6 +223,30 @@ export function useNotifications(options = {}) {
       throw err;
     }
   }, []);
+
+  // Delete single notification
+  const deleteNotification = useCallback(async (notificationId) => {
+    try {
+      await apiClient.delete(`/api/admin/notifications?id=${notificationId}`);
+      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    } catch (err) {
+      console.error('[useNotifications] Error deleting notification:', err);
+      throw err;
+    }
+  }, []);
+
+  // Clear all notifications
+  const clearAll = useCallback(async () => {
+    try {
+      await apiClient.delete('/api/admin/notifications?clearAll=true');
+      setNotifications([]);
+      setUnreadCount(0);
+    } catch (err) {
+      console.error('[useNotifications] Error clearing all notifications:', err);
+      throw err;
+    }
+  }, []);
   
   // Refresh notifications manually
   const refresh = useCallback(async () => {
@@ -268,6 +292,8 @@ export function useNotifications(options = {}) {
     error,
     markAsRead,
     markAllAsRead,
+    deleteNotification,
+    clearAll,
     refresh,
     reconnect: connect,
   };

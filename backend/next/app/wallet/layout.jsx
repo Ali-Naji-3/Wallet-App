@@ -68,6 +68,37 @@ export default function WalletLayout({ children }) {
     }
   }, [authData, authLoading]);
   
+  // SECURITY: Check account status on mount and periodically
+  useEffect(() => {
+    const checkAccountStatus = async () => {
+      try {
+        const response = await fetch('/api/auth/me', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('fxwallet_token')}`,
+          },
+        });
+        
+        if (response.status === 403) {
+          // Account suspended
+          const data = await response.json();
+          clearAuthData();
+          sessionStorage.setItem('suspended_message', data.details || 'Your account has been suspended.');
+          window.location.href = '/login';
+        }
+      } catch (error) {
+        // Ignore errors - might be network issue
+      }
+    };
+    
+    // Check immediately on mount
+    checkAccountStatus();
+    
+    // Check every 5 seconds to catch suspensions quickly
+    const interval = setInterval(checkAccountStatus, 5000);
+    
+    return () => clearInterval(interval);
+  }, []);
+  
   // Show loading while checking auth
   if (authLoading || identityLoading) {
     return (

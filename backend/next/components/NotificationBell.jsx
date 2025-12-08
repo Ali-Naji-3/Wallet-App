@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { Bell, Check, CheckCheck, FileCheck, AlertCircle, Clock, Send, Download, RefreshCw, TrendingUp, Shield, Volume2, VolumeX, Wifi, WifiOff } from 'lucide-react';
+import { Bell, Check, CheckCheck, FileCheck, AlertCircle, Clock, Send, Download, RefreshCw, TrendingUp, Shield, Volume2, VolumeX, Wifi, WifiOff, Trash2, X } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -40,6 +40,8 @@ export default function NotificationBell() {
     error: connectionError,
     markAsRead: markNotificationAsRead,
     markAllAsRead: markAllNotificationsAsRead,
+    deleteNotification,
+    clearAll,
     refresh,
   } = useNotifications({
     enabled: true,
@@ -125,6 +127,31 @@ export default function NotificationBell() {
     } catch (error) {
       console.error('Error marking all as read:', error);
       toast.error('Failed to mark all as read');
+    }
+  };
+
+  const handleDelete = async (notificationId, e) => {
+    e.stopPropagation(); // Prevent notification click
+    try {
+      await deleteNotification(notificationId);
+      toast.success('Notification deleted');
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+      toast.error('Failed to delete notification');
+    }
+  };
+
+  const handleClearAll = async () => {
+    if (!confirm('Are you sure you want to clear all notifications? This action cannot be undone.')) {
+      return;
+    }
+    try {
+      await clearAll();
+      toast.success('All notifications cleared');
+      setOpen(false);
+    } catch (error) {
+      console.error('Error clearing notifications:', error);
+      toast.error('Failed to clear notifications');
     }
   };
 
@@ -252,33 +279,48 @@ export default function NotificationBell() {
             notifications.map((notification) => (
               <div
                 key={notification.id}
-                onClick={() => handleNotificationClick(notification)}
-                className={`p-4 border-b cursor-pointer transition-all ${
+                className={`p-4 border-b transition-all group ${
                   notification.is_read 
                     ? isDark ? 'border-slate-700 hover:bg-slate-800/50' : 'border-gray-100 hover:bg-gray-50'
                     : isDark ? 'border-slate-700 bg-blue-500/10 hover:bg-blue-500/20 border-l-4 border-l-blue-500' : 'border-gray-100 bg-blue-50 hover:bg-blue-100 border-l-4 border-l-blue-500'
                 }`}
               >
                 <div className="flex items-start gap-3">
-                  <div className="mt-0.5">
-                    {getNotificationIcon(notification.type)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className={`text-sm font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                        {notification.title}
-                      </p>
-                      {!notification.is_read && (
-                        <span className="h-2 w-2 bg-amber-500 rounded-full flex-shrink-0 mt-1.5" />
-                      )}
+                  <div 
+                    onClick={() => handleNotificationClick(notification)}
+                    className="flex-1 min-w-0 cursor-pointer"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5">
+                        {getNotificationIcon(notification.type)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className={`text-sm font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                            {notification.title}
+                          </p>
+                          {!notification.is_read && (
+                            <span className="h-2 w-2 bg-amber-500 rounded-full flex-shrink-0 mt-1.5" />
+                          )}
+                        </div>
+                        <p className={`text-xs mt-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                          {notification.body}
+                        </p>
+                        <p className={`text-xs mt-1 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+                          {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
+                        </p>
+                      </div>
                     </div>
-                    <p className={`text-xs mt-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                      {notification.body}
-                    </p>
-                    <p className={`text-xs mt-1 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
-                      {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
-                    </p>
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={`h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity ${isDark ? 'hover:bg-red-500/20 hover:text-red-400' : 'hover:bg-red-100 hover:text-red-600'}`}
+                    onClick={(e) => handleDelete(notification.id, e)}
+                    title="Delete notification"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
             ))
@@ -289,17 +331,28 @@ export default function NotificationBell() {
           <>
             <DropdownMenuSeparator className={isDark ? 'bg-gray-800' : 'bg-gray-200'} />
             <div className="p-3 space-y-2">
-              <Link href="/admin/kyc">
+              <div className="flex gap-2">
+                <Link href="/admin/kyc" className="flex-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={`w-full justify-center ${isDark ? 'border-blue-500/30 text-blue-400 hover:bg-blue-500/10 hover:text-blue-300' : 'border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700'}`}
+                    onClick={() => setOpen(false)}
+                  >
+                    <FileCheck className="h-4 w-4 mr-2" />
+                    Review KYC
+                  </Button>
+                </Link>
                 <Button
                   variant="outline"
                   size="sm"
-                  className={`w-full justify-center ${isDark ? 'border-blue-500/30 text-blue-400 hover:bg-blue-500/10 hover:text-blue-300' : 'border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700'}`}
-                  onClick={() => setOpen(false)}
+                  className={`${isDark ? 'border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300' : 'border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700'}`}
+                  onClick={handleClearAll}
+                  title="Clear all notifications"
                 >
-                  <FileCheck className="h-4 w-4 mr-2" />
-                  Review KYC Requests
+                  <Trash2 className="h-4 w-4" />
                 </Button>
-              </Link>
+              </div>
               <Link href="/admin/notifications">
                 <Button
                   variant="ghost"
