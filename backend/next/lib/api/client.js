@@ -52,9 +52,7 @@ apiClient.interceptors.response.use(
     
     const status = error.response?.status;
     const responseData = error.response?.data;
-    // FIXED: Only treat as suspension if explicitly marked with ACCOUNT_SUSPENDED code
-    // Don't auto-logout on all 403s (could be permission denied, not suspension)
-    const isSuspended = responseData?.code === 'ACCOUNT_SUSPENDED';
+    const isSuspended = responseData?.code === 'ACCOUNT_SUSPENDED' || status === 403;
     
     if (status === 401) {
       // Token expired or invalid
@@ -74,9 +72,13 @@ apiClient.interceptors.response.use(
         }
       }
     } else if (isSuspended) {
-      // Account suspended - clear auth data and redirect to login
-      if (typeof window !== 'undefined') {
-        console.warn('[API Client] Account Suspended - clearing auth data');
+      // IMPORTANT: Only log out if this is a /me or /auth endpoint (user's own account)
+      // Don't log out for 403s from admin actions like rejecting other users' KYC
+      const isAuthEndpoint = error.config?.url?.includes('/api/auth/me') || 
+                            error.config?.url?.includes('/api/admin/notifications/stream');
+      
+      if (isAuthEndpoint && typeof window !== 'undefined') {
+        console.warn('[API Client] 403 Account Suspended - clearing auth data');
         clearAuthData();
         
         // Store suspension message for login page
@@ -86,6 +88,9 @@ apiClient.interceptors.response.use(
         if (!window.location.pathname.includes('/login')) {
           window.location.href = '/login';
         }
+      } else {
+        // 403 from other endpoints (like admin actions) - don't log out, just reject
+        console.warn('[API Client] 403 Forbidden on action - not logging out');
       }
     }
     return Promise.reject(error);

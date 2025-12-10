@@ -35,11 +35,12 @@ export async function GET(req) {
     let sql = `
       SELECT id, email, full_name, role, is_active, created_at
       FROM users
+      WHERE email NOT LIKE 'deleted_%'
     `;
     const params = [];
 
     if (search) {
-      sql += ` WHERE email LIKE ? OR full_name LIKE ?`;
+      sql += ` AND (email LIKE ? OR full_name LIKE ?)`;
       params.push(`%${search}%`, `%${search}%`);
     }
 
@@ -48,11 +49,11 @@ export async function GET(req) {
 
     const [users] = await pool.query(sql, params);
 
-    // Get total count
-    let countSql = `SELECT COUNT(*) as count FROM users`;
+    // Get total count (exclude deleted users)
+    let countSql = `SELECT COUNT(*) as count FROM users WHERE email NOT LIKE 'deleted_%'`;
     const countParams = [];
     if (search) {
-      countSql += ` WHERE email LIKE ? OR full_name LIKE ?`;
+      countSql += ` AND (email LIKE ? OR full_name LIKE ?)`;
       countParams.push(`%${search}%`, `%${search}%`);
     }
     const [countResult] = await pool.query(countSql, countParams);

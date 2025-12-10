@@ -252,15 +252,32 @@ export async function DELETE(req, { params }) {
       );
     }
 
-    // Soft delete: set is_active = 0 and add deleted_at timestamp
-    // First check if deleted_at column exists, if not just deactivate
+    // Soft delete: set is_active = 0 and prefix email with deleted marker
+    // Only add prefix if email doesn't already start with 'deleted_'
     try {
-      await pool.query(
-        `UPDATE users SET is_active = 0, email = CONCAT('deleted_', id, '_', email) WHERE id = ?`,
+      const [currentUser] = await pool.query(
+        `SELECT email FROM users WHERE id = ? LIMIT 1`,
         [userId]
       );
+      
+      const currentEmail = currentUser[0]?.email || '';
+      let newEmail;
+      
+      // Check if email already starts with 'deleted_'
+      if (currentEmail.startsWith('deleted_')) {
+        // Already deleted, just update is_active
+        newEmail = currentEmail;
+      } else {
+        // Add deleted prefix: deleted_<id>_<original_email>
+        newEmail = `deleted_${userId}_${currentEmail}`;
+      }
+      
+      await pool.query(
+        `UPDATE users SET is_active = 0, email = ? WHERE id = ?`,
+        [newEmail, userId]
+      );
     } catch (e) {
-      // If column doesn't exist, just deactivate
+      // Fallback: just deactivate if something goes wrong
       await pool.query(
         `UPDATE users SET is_active = 0 WHERE id = ?`,
         [userId]

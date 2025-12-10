@@ -50,7 +50,7 @@ export default function RefineProvider({ children }) {
         syncWithLocation: true,
         warnWhenUnsavedChanges: false, // Disable to improve performance
         // Disable telemetry to prevent OpaqueResponseBlocking errors
-        // projectId: 'fxwallet-admin', // Commented out to disable telemetry
+        disableTelemetry: true, // Explicitly disable Refine telemetry
         reactQuery: {
           devtoolConfig: false, // Disable devtools in production
           // OPTIMIZATION: Configure React Query caching
