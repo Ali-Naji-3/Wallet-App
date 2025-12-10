@@ -97,15 +97,16 @@ export async function GET(req) {
         }, 1000); // Check every 1 second for instant updates
         
         // Cleanup on disconnect
-            req.signal.addEventListener('abort', () => {
-              closed = true;
-              clearInterval(checkInterval);
-              try {
-                controller.close();
-              } catch (err) {
-                // Already closed
-              }
-            });
+        let closed = false;
+        req.signal.addEventListener('abort', () => {
+          closed = true;
+          clearInterval(checkInterval);
+          try {
+            controller.close();
+          } catch (err) {
+            // Already closed
+          }
+        });
         
       } catch (error) {
         console.error('[SSE User] Error:', error);

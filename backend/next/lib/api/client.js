@@ -52,7 +52,9 @@ apiClient.interceptors.response.use(
     
     const status = error.response?.status;
     const responseData = error.response?.data;
-    const isSuspended = responseData?.code === 'ACCOUNT_SUSPENDED' || status === 403;
+    // FIXED: Only treat as suspension if explicitly marked with ACCOUNT_SUSPENDED code
+    // Don't auto-logout on all 403s (could be permission denied, not suspension)
+    const isSuspended = responseData?.code === 'ACCOUNT_SUSPENDED';
     
     if (status === 401) {
       // Token expired or invalid
@@ -72,10 +74,9 @@ apiClient.interceptors.response.use(
         }
       }
     } else if (isSuspended) {
-      // Account suspended - clear auth data but DON'T redirect automatically
-      // Let the calling code handle the error display
+      // Account suspended - clear auth data and redirect to login
       if (typeof window !== 'undefined') {
-        console.warn('[API Client] 403 Account Suspended - clearing auth data');
+        console.warn('[API Client] Account Suspended - clearing auth data');
         clearAuthData();
         
         // Store suspension message for login page
