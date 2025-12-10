@@ -33,7 +33,9 @@ export async function POST(req, { params }) {
 
     await requireAdmin(token);
 
-    const userId = getUserIdFromRequest(req, params);
+    // Next.js 16: params is a Promise
+    const resolvedParams = await params;
+    const userId = getUserIdFromRequest(req, resolvedParams);
     if (!userId) {
       return NextResponse.json({ message: 'Invalid user ID' }, { status: 400 });
     }

@@ -39,7 +39,9 @@ export async function GET(req, { params }) {
     //   return NextResponse.json({ message: 'Admin access required' }, { status: 403 });
     // }
     
-    const kycId = getIdFromParams(req, params);
+    // Next.js 16: params is a Promise
+    const resolvedParams = await params;
+    const kycId = getIdFromParams(req, resolvedParams);
     if (!kycId) {
       return NextResponse.json({ message: 'Invalid KYC ID' }, { status: 400 });
     }

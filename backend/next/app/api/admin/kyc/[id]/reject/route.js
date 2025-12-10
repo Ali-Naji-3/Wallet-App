@@ -39,6 +39,9 @@ async function ensureSuspensionColumn(pool) {
 
 export async function POST(req, { params }) {
   try {
+    // Next.js 16: params is a Promise
+    const resolvedParams = await params;
+    
     const authHeader = req.headers.get('authorization');
     const token = authHeader?.replace('Bearer ', '');
     
@@ -57,7 +60,7 @@ export async function POST(req, { params }) {
     const [adminRows] = await pool.query('SELECT id, email, full_name, role FROM users WHERE id = ?', [decoded.id]);
     const adminName = adminRows[0]?.full_name || adminRows[0]?.email || 'Admin';
     
-    const kycId = getIdFromParams(req, params);
+    const kycId = getIdFromParams(req, resolvedParams);
     if (!kycId) {
       return NextResponse.json({ message: 'Invalid KYC ID' }, { status: 400 });
     }

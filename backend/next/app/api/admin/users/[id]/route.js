@@ -29,7 +29,9 @@ export async function GET(req, { params }) {
 
     await requireAdmin(token);
 
-    const userId = getUserIdFromRequest(req, params);
+    // Next.js 16: params is a Promise, must await it
+    const resolvedParams = await params;
+    const userId = getUserIdFromRequest(req, resolvedParams);
     if (!userId) {
       return NextResponse.json({ message: 'Invalid user ID' }, { status: 400 });
     }
@@ -105,7 +107,9 @@ export async function PUT(req, { params }) {
 
     await requireAdmin(token);
 
-    const userId = getUserIdFromRequest(req, params);
+    // Next.js 16: params is a Promise, must await it
+    const resolvedParams = await params;
+    const userId = getUserIdFromRequest(req, resolvedParams);
     if (!userId) {
       return NextResponse.json({ message: 'Invalid user ID' }, { status: 400 });
     }
@@ -217,7 +221,9 @@ export async function DELETE(req, { params }) {
 
     const admin = await requireAdmin(token);
 
-    const userId = getUserIdFromRequest(req, params);
+    // Next.js 16: params is a Promise, must await it
+    const resolvedParams = await params;
+    const userId = getUserIdFromRequest(req, resolvedParams);
     if (!userId) {
       return NextResponse.json({ message: 'Invalid user ID' }, { status: 400 });
     }

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getPool } from '@/lib/db';
+import { getPool, ensureNotificationTable } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
 
 function getIdFromParams(req, params) {
@@ -19,6 +19,9 @@ function getIdFromParams(req, params) {
 
 export async function POST(req, { params }) {
   try {
+    // Next.js 16: params is a Promise
+    const resolvedParams = await params;
+    
     const authHeader = req.headers.get('authorization');
     const token = authHeader?.replace('Bearer ', '');
     
@@ -41,7 +44,7 @@ export async function POST(req, { params }) {
     //   return NextResponse.json({ message: 'Admin access required' }, { status: 403 });
     // }
     
-    const kycId = getIdFromParams(req, params);
+    const kycId = getIdFromParams(req, resolvedParams);
     if (!kycId) {
       return NextResponse.json({ message: 'Invalid KYC ID' }, { status: 400 });
     }
@@ -84,6 +87,22 @@ export async function POST(req, { params }) {
        WHERE id = ?`,
       [kycData.tier, kycData.user_id]
     );
+    
+    // Create notification for the user
+    try {
+      await ensureNotificationTable();
+      await pool.query(
+        `INSERT INTO notifications (user_id, type, title, body)
+         VALUES (?, 'kyc_approved', 'KYC Verification Approved', ?)`,
+        [
+          kycData.user_id,
+          `Great news! Your Tier ${kycData.tier} KYC verification has been approved. You can now access all premium features.`
+        ]
+      );
+    } catch (notifError) {
+      console.error('Error creating notification:', notifError);
+      // Don't fail the approval if notification fails
+    }
     
     // Get updated KYC
     const [updated] = await pool.query(
