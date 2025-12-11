@@ -1,7 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { checkLoginAttempts, recordLoginAttempt, clearLoginAttempts } from '@/lib/rateLimit';
+import { sendLoginAlertEmail } from '@/lib/email';
+import { sendLoginAlertSMS } from '@/lib/sms';
 
 /**
  * POST /api/auth/login
@@ -12,6 +15,12 @@ export async function POST(req) {
     const body = await req.json().catch(() => ({}));
     const { email, password } = body || {};
 
+    // Get IP address
+    const ipAddress = req.headers.get('x-forwarded-for') || 
+                      req.headers.get('x-real-ip') || 
+                      'unknown';
+    const userAgent = req.headers.get('user-agent') || 'Unknown';
+
     if (!email || !password) {
       return NextResponse.json(
         { message: 'Email and password are required' },
@@ -19,10 +28,23 @@ export async function POST(req) {
       );
     }
 
+    // Check rate limiting
+    const attemptCheck = await checkLoginAttempts(email, ipAddress);
+    if (!attemptCheck.allowed) {
+      return NextResponse.json(
+        { 
+          message: attemptCheck.message,
+          error: 'TOO_MANY_ATTEMPTS',
+          attemptsLeft: 0,
+        },
+        { status: 429 }
+      );
+    }
+
     const pool = getPool();
     
-    // 1. Find user by email (include suspension_reason if exists)
-    let userQuery = `SELECT id, email, password_hash, full_name, base_currency, timezone, role, is_active`;
+    // Find user by email
+    let userQuery = `SELECT id, email, password_hash, full_name, phone_number, base_currency, timezone, role, is_active`;
     
     // Check if suspension_reason column exists
     try {
@@ -40,28 +62,35 @@ export async function POST(req) {
     
     const user = rows[0];
     if (!user) {
-      console.log(`[Login] User not found for email: ${email}`);
+      console.log(`[Login] User not found: ${email} from IP: ${ipAddress}`);
+      await recordLoginAttempt(email, ipAddress, false);
+      
       return NextResponse.json(
-        { message: 'Invalid credentials' },
+        { 
+          message: 'Invalid email or password',
+          attemptsLeft: attemptCheck.attemptsLeft - 1,
+        },
         { status: 401 }
       );
     }
     
-    console.log(`[Login] User found: ID=${user.id}, Email=${user.email}, Role=${user.role}`);
+    console.log(`[Login] User found: ${user.email} (ID: ${user.id})`);
     
-    // SECURITY: Verify the email matches (prevent email injection)
+    // Verify email
     if (user.email.toLowerCase() !== email.toLowerCase()) {
-      console.error(`[Login] SECURITY WARNING: Email mismatch! Query: ${email}, Found: ${user.email}`);
+      console.error(`[SECURITY] Email mismatch! Query: ${email}, Found: ${user.email}`);
       return NextResponse.json(
-        { message: 'Invalid credentials' },
+        { message: 'Invalid email or password' },
         { status: 401 }
       );
     }
 
-    // Check if user account is suspended/frozen
+    // Check if account is suspended
     if (!user.is_active) {
-      // Professional message for suspended accounts
       const suspensionReason = user.suspension_reason || null;
+      
+      console.log(`[Login] Blocked suspended account: ${user.email}`);
+      await recordLoginAttempt(email, ipAddress, false);
       
       return NextResponse.json(
         { 
@@ -77,16 +106,22 @@ export async function POST(req) {
       );
     }
 
-    // 2. Verify password
+    // Verify password
     const isValid = await bcrypt.compare(password, user.password_hash);
     if (!isValid) {
+      console.log(`[Login] Invalid password for: ${email}`);
+      await recordLoginAttempt(email, ipAddress, false);
+      
       return NextResponse.json(
-        { message: 'Invalid credentials' },
+        { 
+          message: 'Invalid email or password',
+          attemptsLeft: attemptCheck.attemptsLeft - 1,
+        },
         { status: 401 }
       );
     }
 
-    // 3. Create JWT Token
+    // Create JWT Token
     const secret = process.env.JWT_SECRET;
     if (!secret) {
       throw new Error('JWT_SECRET not configured');
@@ -99,16 +134,31 @@ export async function POST(req) {
         role: user.role || 'user',
       },
       secret,
-      { expiresIn: '1d' } // Token expires in 1 day
+      { expiresIn: '1d' }
     );
 
-    // 4. Return token and user info
+    // Record successful login
+    await recordLoginAttempt(email, ipAddress, true);
+    await clearLoginAttempts(email);
+
+    // Send security alerts (async, non-blocking)
+    Promise.all([
+      sendLoginAlertEmail(user.email, user.full_name, ipAddress, userAgent).catch(err => 
+        console.error('Failed to send login alert email:', err)
+      ),
+      user.phone_number ? sendLoginAlertSMS(user.phone_number, ipAddress).catch(err =>
+        console.error('Failed to send login alert SMS:', err)
+      ) : Promise.resolve()
+    ]);
+
+    // Return success response
     const responseData = {
       token,
       user: {
         id: user.id,
         email: user.email,
         fullName: user.full_name,
+        phoneNumber: user.phone_number,
         baseCurrency: user.base_currency,
         timezone: user.timezone,
         role: user.role || 'user',
@@ -116,15 +166,15 @@ export async function POST(req) {
       },
     };
     
-    console.log(`[Login] Returning user data: Email=${responseData.user.email}, Role=${responseData.user.role}`);
+    console.log(`✅ [Login] Success: ${user.email} from IP: ${ipAddress}`);
     
     return NextResponse.json(responseData);
+    
   } catch (err) {
-    console.error('Login error:', err);
+    console.error('❌ [Login] Error:', err);
     return NextResponse.json(
       { message: err?.message || 'Failed to login' },
       { status: 500 }
     );
   }
 }
-
