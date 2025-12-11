@@ -58,13 +58,23 @@ apiClient.interceptors.response.use(
       // Token expired or invalid
       if (typeof window !== 'undefined') {
         const isOnLoginPage = window.location.pathname.includes('/login');
+        const isOnSupportPage = window.location.pathname.includes('/wallet/support');
         const isLoginEndpoint = error.config?.url?.includes('/api/auth/login');
+        const isSupportEndpoint = error.config?.url?.includes('/api/support/');
+        
+        // CRITICAL: Don't redirect from support page or support endpoints
+        // Support page must be accessible to everyone, including unauthenticated users
+        if (isOnSupportPage || isSupportEndpoint) {
+          console.log('[API Client] 401 on support page/endpoint - not redirecting (public access)');
+          // Just reject the promise - don't interfere with support page
+          return Promise.reject(error);
+        }
         
         // CRITICAL: Don't redirect or clear data on login page or login endpoint
         // The login page needs to handle the error itself
         if (!isOnLoginPage && !isLoginEndpoint) {
-          console.warn('[API Client] 401 Unauthorized - clearing token and redirecting to login');
-          clearAuthData();
+        console.warn('[API Client] 401 Unauthorized - clearing token and redirecting to login');
+        clearAuthData();
           window.location.href = '/login';
         } else {
           // On login page or login endpoint - don't interfere
@@ -75,9 +85,19 @@ apiClient.interceptors.response.use(
     } else if (isSuspended) {
       // IMPORTANT: Handle 403 errors carefully
       const isOnLoginPage = typeof window !== 'undefined' && window.location.pathname.includes('/login');
+      const isOnSupportPage = typeof window !== 'undefined' && window.location.pathname.includes('/wallet/support');
       const isLoginEndpoint = error.config?.url?.includes('/api/auth/login');
+      const isSupportEndpoint = error.config?.url?.includes('/api/support/');
       const isAuthEndpoint = error.config?.url?.includes('/api/auth/me') || 
                             error.config?.url?.includes('/api/admin/notifications/stream');
+      
+      // CRITICAL: Don't redirect from support page or support endpoints
+      // Support page must be accessible even for frozen/suspended users
+      if (isOnSupportPage || isSupportEndpoint) {
+        console.log('[API Client] 403 on support page/endpoint - not redirecting (public access)');
+        // Just reject the promise - don't interfere with support page
+        return Promise.reject(error);
+      }
       
       // CRITICAL: If this is a login attempt (403 from /api/auth/login), 
       // DON'T clear auth data or redirect - let the login page handle it

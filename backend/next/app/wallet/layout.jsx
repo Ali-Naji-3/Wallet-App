@@ -50,6 +50,14 @@ export default function WalletLayout({ children }) {
   // ALL HOOKS MUST BE CALLED FIRST - before any conditional returns
   const pathname = usePathname();
   const router = useRouter();
+  
+  // CRITICAL: Check if support page FIRST - before any auth hooks
+  // This ensures support page is always accessible, even for frozen/suspended users
+  const isSupportPage = pathname === '/wallet/support';
+  
+  // Only run auth hooks if NOT on support page (to avoid unnecessary API calls)
+  // But we still need to call hooks conditionally - React rules require hooks to be called consistently
+  // So we'll call them but skip their effects for support page
   const { data: identity, isLoading: identityLoading } = useGetIdentity();
   const { data: authData, isLoading: authLoading } = useIsAuthenticated();
   const { mutate: logout } = useLogout();
@@ -57,7 +65,14 @@ export default function WalletLayout({ children }) {
   const hasRedirectedRef = useRef(false);
   
   // SECURITY: Redirect to login if not authenticated (only once)
+  // BUT: Skip redirect entirely for support page
   useEffect(() => {
+    // CRITICAL: Don't redirect if on support page - support page must be accessible to everyone
+    if (isSupportPage) {
+      console.log('[Wallet Layout] Support page detected - skipping authentication redirect');
+      return; // Skip all redirects for support page
+    }
+    
     if (!authLoading && !authData?.authenticated && !hasRedirectedRef.current) {
       hasRedirectedRef.current = true;
       console.log('[Wallet Layout] Not authenticated - redirecting to login');
@@ -66,7 +81,7 @@ export default function WalletLayout({ children }) {
       // Use window.location for immediate redirect, bypassing React navigation
       window.location.href = '/login';
     }
-  }, [authData, authLoading]);
+  }, [authData, authLoading, isSupportPage]);
   
   // SECURITY: Check account status on mount and periodically
   // BUT: Allow access to support page even if account is frozen
@@ -105,13 +120,11 @@ export default function WalletLayout({ children }) {
     return () => clearInterval(interval);
   }, [pathname]);
   
-  // Allow support page to render even if not authenticated (for frozen users)
-  const isSupportPage = pathname === '/wallet/support';
-  
-  // Show loading while checking auth
+  // Show loading while checking auth (but skip for support page)
   if (authLoading || identityLoading) {
-    // Allow support page to show even during loading
+    // Allow support page to show even during loading - no auth required
     if (isSupportPage) {
+      console.log('[Wallet Layout] Support page - rendering without waiting for auth');
       return <>{children}</>;
     }
     return (
@@ -125,12 +138,14 @@ export default function WalletLayout({ children }) {
   }
   
   // Don't render if not authenticated (except support page)
+  // Support page must always be accessible
   if (!authData?.authenticated && !isSupportPage) {
     return null;
   }
   
-  // For support page, render without layout if not authenticated
-  if (isSupportPage && !authData?.authenticated) {
+  // For support page, always render - no authentication required
+  if (isSupportPage) {
+    console.log('[Wallet Layout] Support page - rendering without authentication requirement');
     return <>{children}</>;
   }
 

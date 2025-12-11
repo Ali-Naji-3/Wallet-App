@@ -1,0 +1,197 @@
+{
+  "timestamp": "2025-12-11T10:51:45.162Z",
+  "baseUrl": "http://localhost:4000/api",
+  "detectedUrl": "http://localhost:4000",
+  "summary": {
+    "total": 45,
+    "passed": 34,
+    "failed": 5,
+    "warnings": 6
+  },
+  "passed": [
+    {
+      "name": "Database Ping",
+      "details": "Successfully connected to MySQL database"
+    },
+    {
+      "name": "Connection Pool",
+      "details": "Connection pool created successfully"
+    },
+    {
+      "name": "Simple Query",
+      "details": "Successfully executed SELECT query"
+    },
+    {
+      "name": "Table: users",
+      "details": "Table exists"
+    },
+    {
+      "name": "Table: wallets",
+      "details": "Table exists"
+    },
+    {
+      "name": "Table: transactions",
+      "details": "Table exists"
+    },
+    {
+      "name": "Table: notifications",
+      "details": "Table exists"
+    },
+    {
+      "name": "Table: kyc_verifications",
+      "details": "Table exists"
+    },
+    {
+      "name": "Table: support_requests",
+      "details": "Table exists"
+    },
+    {
+      "name": "Admin User Exists",
+      "details": "Found admin: testuser@fxwallet.com"
+    },
+    {
+      "name": "JWT_SECRET Environment Variable",
+      "details": "JWT_SECRET is configured"
+    },
+    {
+      "name": "Token Generation",
+      "details": "Successfully generated JWT token"
+    },
+    {
+      "name": "Token Verification",
+      "details": "Token verified successfully"
+    },
+    {
+      "name": "Expired Token Detection",
+      "details": "Expired token correctly rejected"
+    },
+    {
+      "name": "Invalid Token Detection",
+      "details": "Invalid token correctly rejected"
+    },
+    {
+      "name": "Bearer Token Parsing",
+      "details": "Bearer token parsed correctly"
+    },
+    {
+      "name": "GET /api/health",
+      "details": "Health check endpoint working"
+    },
+    {
+      "name": "Login with Invalid Credentials",
+      "details": "Correctly returned 401"
+    },
+    {
+      "name": "Login with Missing Fields",
+      "details": "Correctly returned 400"
+    },
+    {
+      "name": "POST /api/auth/register",
+      "details": "User created: test-1765450304140@test.com"
+    },
+    {
+      "name": "GET /api/auth/me",
+      "details": "User: test-1765450304140@test.com"
+    },
+    {
+      "name": "GET /api/auth/me (No Token)",
+      "details": "Correctly returned 401"
+    },
+    {
+      "name": "GET /api/wallets/my",
+      "details": "Wallets retrieved"
+    },
+    {
+      "name": "GET /api/wallets/currencies",
+      "details": "Currencies retrieved"
+    },
+    {
+      "name": "GET /api/transactions/my",
+      "details": "Transactions retrieved"
+    },
+    {
+      "name": "GET /api/notifications/my",
+      "details": "Notifications retrieved"
+    },
+    {
+      "name": "GET /api/dashboard/portfolio",
+      "details": "Portfolio data retrieved"
+    },
+    {
+      "name": "GET /api/kyc/my-status",
+      "details": "KYC status retrieved"
+    },
+    {
+      "name": "Admin Login",
+      "details": "Logged in as testuser@fxwallet.com (password: test123)"
+    },
+    {
+      "name": "GET /api/admin/stats",
+      "details": "Admin stats retrieved"
+    },
+    {
+      "name": "GET /api/admin/users",
+      "details": "Found 17 users"
+    },
+    {
+      "name": "GET /api/admin/transactions",
+      "details": "Transactions retrieved"
+    },
+    {
+      "name": "GET /api/admin/kyc",
+      "details": "KYC requests retrieved"
+    },
+    {
+      "name": "Notification Stream Endpoint",
+      "details": "Endpoint exists: http://localhost:4000/api/notifications/stream"
+    }
+  ],
+  "failed": [
+    {
+      "name": "GET /api/admin/users/[id]",
+      "details": "Error: User not found"
+    },
+    {
+      "name": "GET /api/admin/support/requests",
+      "details": "Error: User not found"
+    },
+    {
+      "name": "POST /api/support/submit",
+      "details": "Error: Request failed with status code 404"
+    },
+    {
+      "name": "POST /api/support/submit (Missing Fields)",
+      "details": "Unexpected status: 404"
+    },
+    {
+      "name": "POST /api/admin/support/send-verification",
+      "details": "Error: User not found"
+    }
+  ],
+  "warnings": [
+    {
+      "name": "Email Config: SMTP_HOST",
+      "details": "Not configured"
+    },
+    {
+      "name": "Email Config: SMTP_PORT",
+      "details": "Not configured"
+    },
+    {
+      "name": "Email Config: SMTP_USER",
+      "details": "Not configured"
+    },
+    {
+      "name": "Email Config: SMTP_PASS",
+      "details": "Not configured"
+    },
+    {
+      "name": "Email Service Status",
+      "details": "Email service is not fully configured"
+    },
+    {
+      "name": "Notification Stream Connection",
+      "details": "Manual test required (EventSource)"
+    }
+  ]
+}

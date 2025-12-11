@@ -439,16 +439,27 @@ export default function LoginPage() {
                         <Phone className="h-3 w-3" />
                         <span>Contact support: <a href="mailto:support@fxwallet.com" className="text-amber-400 hover:underline">support@fxwallet.com</a></span>
                       </div>
-                      <Link href="/wallet/support">
-                        <Button
-                          type="button"
-                          size="sm"
-                          className="w-full mt-2 bg-amber-500 hover:bg-amber-600 text-gray-900 text-xs h-8"
-                        >
-                          <Mail className="h-3 w-3 mr-2" />
-                          Submit Support Request
-                        </Button>
-                      </Link>
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="w-full mt-2 bg-amber-500 hover:bg-amber-600 text-gray-900 text-xs h-8"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          console.log('[Login Page] Navigating to support page');
+                          try {
+                            router.push('/wallet/support');
+                          } catch (error) {
+                            console.error('[Login Page] Navigation error, using window.location:', error);
+                            // Fallback to window.location if router fails
+                            window.location.href = '/wallet/support';
+                          }
+                        }}
+                        disabled={false}
+                      >
+                        <Mail className="h-3 w-3 mr-2" />
+                        Submit Support Request
+                      </Button>
                     </div>
                   )}
                 </div>
