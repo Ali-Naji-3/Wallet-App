@@ -191,3 +191,4 @@ The verification email includes:
 - Consider using environment-specific SMTP accounts
 - Monitor email logs for suspicious activity
 
+

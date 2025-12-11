@@ -25,6 +25,7 @@ import {
   Smartphone as Phone,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import apiClient from '@/lib/api/client';
 
 export default function WalletSettingsPage() {
   const { data: identity } = useGetIdentity();
@@ -65,19 +66,54 @@ export default function WalletSettingsPage() {
   };
 
   const handleChangePassword = async () => {
+    // Validation
+    if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+      toast.error('All password fields are required');
+      return;
+    }
+
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       toast.error('New passwords do not match');
       return;
     }
+
     if (passwordData.newPassword.length < 8) {
-      toast.error('Password must be at least 8 characters');
+      toast.error('Password must be at least 8 characters long');
       return;
     }
+
+    // Password strength validation
+    const passwordStrengthRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/;
+    if (!passwordStrengthRegex.test(passwordData.newPassword)) {
+      toast.error('Password must contain at least one uppercase letter, one lowercase letter, and one number');
+      return;
+    }
+
+    if (passwordData.currentPassword === passwordData.newPassword) {
+      toast.error('New password must be different from current password');
+      return;
+    }
+
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    toast.success('Password changed successfully!');
-    setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
-    setIsLoading(false);
+    try {
+      const { data } = await apiClient.post('/api/auth/change-password', {
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword,
+        confirmPassword: passwordData.confirmPassword,
+      });
+
+      if (data.success) {
+        toast.success('Password changed successfully!');
+        setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      } else {
+        toast.error(data.message || 'Failed to change password');
+      }
+    } catch (error) {
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to change password';
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -174,6 +210,7 @@ export default function WalletSettingsPage() {
                     value={passwordData.currentPassword}
                     onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
                     className="bg-slate-900 border-slate-700 text-white pr-10"
+                    placeholder="Enter current password"
                   />
                   <button
                     type="button"
