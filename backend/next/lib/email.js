@@ -194,6 +194,137 @@ export async function sendVerificationEmail(to, userName = 'User', options = {})
 }
 
 /**
+ * Send KYC submission confirmation email to client
+ * @param {Object} kycData - KYC submission data
+ * @param {string} kycData.userEmail - Client's email address
+ * @param {string} kycData.userName - Client's name
+ * @param {number} kycData.kycId - KYC verification ID
+ * @returns {Promise<Object>} - Email send result
+ */
+export async function sendKYCSubmissionConfirmation(kycData) {
+  try {
+    const { userEmail, userName, kycId } = kycData;
+
+    // Validate required fields
+    if (!userEmail || !userEmail.includes('@')) {
+      throw new Error('Valid user email is required');
+    }
+
+    // Check if SMTP is configured
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      console.warn('[Email] SMTP not configured. KYC submission confirmation email disabled.');
+      return {
+        success: false,
+        message: 'Email service not configured',
+        skipped: true,
+      };
+    }
+
+    const transporter = createTransporter();
+    const supportEmail = process.env.SUPPORT_EMAIL || 'support@fxwallet.com';
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:4000';
+
+    const mailOptions = {
+      from: `"FXWallet" <${process.env.SMTP_USER}>`,
+      to: userEmail,
+      subject: 'Your KYC Verification Request Has Been Submitted',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>KYC Verification Submitted</title>
+        </head>
+        <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6;">
+          <table role="presentation" style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="padding: 40px 20px;">
+                <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                  <!-- Header -->
+                  <tr>
+                    <td style="padding: 30px 40px; text-align: center; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius: 8px 8px 0 0;">
+                      <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 700;">KYC Verification Submitted</h1>
+                    </td>
+                  </tr>
+                  
+                  <!-- Content -->
+                  <tr>
+                    <td style="padding: 40px;">
+                      <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                        Hello ${userName || 'Valued Client'},
+                      </p>
+                      
+                      <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                        We have received your KYC verification request. We will review it shortly and notify you once approved.
+                      </p>
+                      
+                      <!-- Info Box -->
+                      <div style="margin: 30px 0; padding: 20px; background-color: #f9fafb; border-radius: 6px; border-left: 4px solid #f59e0b;">
+                        <p style="margin: 0; color: #374151; font-size: 14px; line-height: 1.6;">
+                          <strong>What happens next?</strong><br>
+                          Our team will review your submitted documents and verification details. You will receive an email notification once the review is complete.
+                        </p>
+                      </div>
+                      
+                      <p style="margin: 20px 0 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
+                        If you have any questions or need assistance, please contact our support team at 
+                        <a href="mailto:${supportEmail}" style="color: #f59e0b; text-decoration: none;">${supportEmail}</a>
+                      </p>
+                    </td>
+                  </tr>
+                  
+                  <!-- Footer -->
+                  <tr>
+                    <td style="padding: 20px 40px; text-align: center; background-color: #f9fafb; border-radius: 0 0 8px 8px;">
+                      <p style="margin: 0; color: #6b7280; font-size: 12px;">
+                        © ${new Date().getFullYear()} FXWallet. All rights reserved.
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+      `,
+      text: `
+KYC Verification Submitted - FXWallet
+
+Hello ${userName || 'Valued Client'},
+
+We have received your KYC verification request. We will review it shortly and notify you once approved.
+
+What happens next?
+Our team will review your submitted documents and verification details. You will receive an email notification once the review is complete.
+
+If you have any questions, please contact our support team at ${supportEmail}
+
+© ${new Date().getFullYear()} FXWallet. All rights reserved.
+      `,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    
+    console.log(`[Email] KYC submission confirmation sent to ${userEmail}. Message ID: ${info.messageId}`);
+    
+    return {
+      success: true,
+      messageId: info.messageId,
+      message: 'KYC submission confirmation email sent successfully',
+    };
+  } catch (error) {
+    console.error('[Email] ❌ Error sending KYC submission confirmation:', error);
+    return {
+      success: false,
+      message: error.message || 'Failed to send KYC submission confirmation email',
+      error: 'EMAIL_SEND_FAILED',
+    };
+  }
+}
+
+/**
  * Send support request notification email to admin
  * @param {Object} supportData - Support request data
  * @param {string} supportData.userEmail - User's email address

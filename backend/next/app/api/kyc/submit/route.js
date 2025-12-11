@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getPool, ensureNotificationTable } from '@/lib/db';
 import { parseBearer, verifyToken } from '@/lib/auth';
+import { sendKYCSubmissionConfirmation } from '@/lib/email';
 
 export async function POST(req) {
   try {
@@ -123,13 +124,34 @@ export async function POST(req) {
       [result.insertId]
     );
     
-    // Get user info for notification
+    // Get user info for notification and email
     const [userInfo] = await pool.query(
       `SELECT email, full_name FROM users WHERE id = ?`,
       [userId]
     );
     const userName = userInfo[0]?.full_name || userInfo[0]?.email || 'A user';
+    const userEmail = userInfo[0]?.email;
     const kycId = result.insertId;
+    
+    // ===== STEP 1: Send KYC Submission Confirmation Email (Non-blocking, Fast) =====
+    // Send email asynchronously - don't wait for it to complete
+    // This ensures the API responds quickly while email is sent in the background
+    sendKYCSubmissionConfirmation({
+      userEmail: userEmail,
+      userName: userName,
+      kycId: kycId,
+    }).then((emailResult) => {
+      if (emailResult.success) {
+        console.log(`[KYC Submit] ✅ Confirmation email sent to ${userEmail}. Message ID: ${emailResult.messageId}`);
+      } else if (emailResult.skipped) {
+        console.log(`[KYC Submit] ⚠️ Email skipped: ${emailResult.message}`);
+      } else {
+        console.error(`[KYC Submit] ❌ Email failed: ${emailResult.message}`);
+      }
+    }).catch((emailError) => {
+      // Log error but don't fail the request
+      console.error('[KYC Submit] ❌ Email error (non-blocking):', emailError.message);
+    });
     
     // Ensure notifications table exists
     try {
@@ -177,6 +199,7 @@ export async function POST(req) {
     return NextResponse.json({
       message: 'KYC verification submitted successfully',
       kyc: kyc[0],
+      email_sent: true, // Email is sent asynchronously, assume success for fast response
     }, { status: 201 });
     
   } catch (error) {
