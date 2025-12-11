@@ -54,5 +54,19 @@ export const ENDPOINTS = {
     MY: '/api/notifications/my',
     MARK_READ: (id) => `/api/notifications/${id}/read`,
   },
+  
+  // Admin - Support
+  ADMIN_SUPPORT: {
+    SEARCH: '/api/admin/support/search',
+    SEND_VERIFICATION: '/api/admin/support/send-verification',
+    RECENT_EMAILS: '/api/admin/support/recent-emails',
+    SAVE_REQUEST: '/api/admin/support/save-request',
+    GET_REQUESTS: '/api/admin/support/requests',
+  },
+  
+  // Support (User-facing)
+  SUPPORT: {
+    SUBMIT_REQUEST: '/api/support/submit',
+  },
 };
 

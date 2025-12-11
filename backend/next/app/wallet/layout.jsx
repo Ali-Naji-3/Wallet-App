@@ -69,7 +69,13 @@ export default function WalletLayout({ children }) {
   }, [authData, authLoading]);
   
   // SECURITY: Check account status on mount and periodically
+  // BUT: Allow access to support page even if account is frozen
   useEffect(() => {
+    // Don't check account status if user is on support page
+    if (pathname === '/wallet/support') {
+      return; // Allow access to support page
+    }
+    
     const checkAccountStatus = async () => {
       try {
         const response = await fetch('/api/auth/me', {
@@ -97,10 +103,17 @@ export default function WalletLayout({ children }) {
     const interval = setInterval(checkAccountStatus, 5000);
     
     return () => clearInterval(interval);
-  }, []);
+  }, [pathname]);
+  
+  // Allow support page to render even if not authenticated (for frozen users)
+  const isSupportPage = pathname === '/wallet/support';
   
   // Show loading while checking auth
   if (authLoading || identityLoading) {
+    // Allow support page to show even during loading
+    if (isSupportPage) {
+      return <>{children}</>;
+    }
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-950">
         <div className="text-center">
@@ -111,9 +124,14 @@ export default function WalletLayout({ children }) {
     );
   }
   
-  // Don't render if not authenticated
-  if (!authData?.authenticated) {
+  // Don't render if not authenticated (except support page)
+  if (!authData?.authenticated && !isSupportPage) {
     return null;
+  }
+  
+  // For support page, render without layout if not authenticated
+  if (isSupportPage && !authData?.authenticated) {
+    return <>{children}</>;
   }
 
   const handleLogout = () => {

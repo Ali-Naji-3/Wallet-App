@@ -7,14 +7,15 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Wallet, Mail, Lock, Loader2, AlertCircle, ShieldX, Phone } from 'lucide-react';
+import { Wallet, Mail, Lock, Loader2, AlertCircle, ShieldX, Phone, XCircle, Ban, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
+import Link from 'next/link';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { mutate: login, isLoading } = useLogin();
+  const { mutate: login, isLoading: refineIsLoading } = useLogin();
   
   const [mode, setMode] = useState('login'); // 'login' | 'register'
   const [formData, setFormData] = useState({
@@ -28,16 +29,27 @@ export default function LoginPage() {
     confirmPassword: '',
   });
   const [error, setError] = useState('');
-  const [suspendedAccount, setSuspendedAccount] = useState(null); // { message, details }
+  const [accountIssue, setAccountIssue] = useState(null); // { type, message, details, code }
   const [isRegistering, setIsRegistering] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false); // Local loading state to override Refine's
+  
+  // Use local loading state - it's more reliable than Refine's isLoading
+  const isLoading = isLoggingIn || refineIsLoading;
 
   // Check for suspended message on page load (when redirected from a frozen account)
   useEffect(() => {
     const suspendedMessage = sessionStorage.getItem('suspended_message');
     if (suspendedMessage) {
-      setSuspendedAccount({
-        message: 'Account Suspended',
+      setAccountIssue({
+        type: 'frozen',
+        message: 'Account Frozen',
         details: suspendedMessage,
+        code: 'ACCOUNT_FROZEN',
+      });
+      // Show toast notification
+      toast.error('Account Frozen', {
+        description: suspendedMessage,
+        duration: 6000,
       });
       // Clear the message after showing it
       sessionStorage.removeItem('suspended_message');
@@ -46,13 +58,121 @@ export default function LoginPage() {
 
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
+    e.stopPropagation(); // Prevent any event bubbling
+    
+    // Prevent form from submitting normally
+    if (e && typeof e.preventDefault === 'function') {
+      e.preventDefault();
+    }
+    
     setError('');
-    setSuspendedAccount(null);
+    setAccountIssue(null);
+    setIsLoggingIn(true); // Set local loading state
 
     if (!formData.email || !formData.password) {
       setError('Please enter both email and password');
-      return;
+      setIsLoggingIn(false); // Clear loading state
+      toast.error('Missing Information', {
+        description: 'Please enter both email and password',
+        duration: 3000,
+      });
+      return false; // Prevent any further execution
     }
+
+    // Helper function to handle errors and show notifications
+    const handleError = (errorResponse) => {
+      // Handle multiple possible error structures
+      const responseData = errorResponse?.response?.data || errorResponse?.data || errorResponse || {};
+      const errorCode = responseData.code || errorResponse?.code;
+      const errorMessage = responseData.details || responseData.message || errorResponse?.message || errorResponse?.error?.message || '';
+      const errorName = errorResponse?.name || responseData?.name || '';
+      const statusCode = errorResponse?.response?.status || errorResponse?.status;
+      
+      console.log('[Login Page] Handling error:', { 
+        errorCode, 
+        errorMessage, 
+        errorName, 
+        statusCode,
+        responseData,
+        fullError: errorResponse 
+      });
+      
+      // Always show toast notification - this ensures user sees feedback
+      // Check for frozen account (multiple ways to detect)
+      if (errorCode === 'ACCOUNT_FROZEN' || errorCode === 'ACCOUNT_SUSPENDED' || 
+          errorName === 'AccountFrozen' || errorName === 'AccountSuspended' ||
+          statusCode === 403) {
+        const message = errorMessage || 'Your account has been frozen. Please contact support for assistance.';
+        console.log('[Login Page] Showing frozen account notification:', message);
+        setAccountIssue({
+          type: 'frozen',
+          message: 'Account Frozen',
+          details: message,
+          code: errorCode || 'ACCOUNT_FROZEN',
+        });
+        // Show toast IMMEDIATELY - no delay to prevent page reload
+        toast.error('Account Frozen', {
+          description: message,
+          duration: 6000,
+        });
+      } else if (errorCode === 'ACCOUNT_DELETED' || errorName === 'AccountDeleted') {
+        const message = errorMessage || 'This account has been deleted. If you believe this is an error, please contact support.';
+        console.log('[Login Page] Showing deleted account notification:', message);
+        setAccountIssue({
+          type: 'deleted',
+          message: 'Account Deleted',
+          details: message,
+          code: 'ACCOUNT_DELETED',
+        });
+        // Show toast IMMEDIATELY
+        toast.error('Account Deleted', {
+          description: message,
+          duration: 6000,
+        });
+      } else if (errorCode === 'ACCOUNT_REJECTED' || errorName === 'AccountRejected') {
+        const message = errorMessage || 'Your account has been rejected due to KYC verification failure. Please contact support for assistance.';
+        console.log('[Login Page] Showing rejected account notification:', message);
+        setAccountIssue({
+          type: 'rejected',
+          message: 'Account Rejected',
+          details: message,
+          code: 'ACCOUNT_REJECTED',
+        });
+        // Show toast IMMEDIATELY
+        toast.error('Account Rejected', {
+          description: message,
+          duration: 6000,
+        });
+      } else if (errorCode === 'INVALID_EMAIL' || errorName === 'InvalidEmail') {
+        const message = errorMessage || 'The email address you entered is not registered.';
+        console.log('[Login Page] Showing invalid email notification:', message);
+        setError(message);
+        // Show toast IMMEDIATELY
+        toast.error('Email Not Found', {
+          description: message,
+          duration: 4000,
+        });
+      } else if (errorCode === 'INVALID_PASSWORD' || errorName === 'InvalidPassword') {
+        const message = errorMessage || 'The password you entered is incorrect.';
+        console.log('[Login Page] Showing invalid password notification:', message);
+        setError(message);
+        // Show toast IMMEDIATELY
+        toast.error('Incorrect Password', {
+          description: message,
+          duration: 4000,
+        });
+      } else {
+        // Generic error fallback - always show notification
+        const message = errorMessage || 'Invalid credentials. Please check your email and password.';
+        console.log('[Login Page] Showing generic error notification:', message);
+        setError(message);
+        // Show toast IMMEDIATELY
+        toast.error('Login Failed', {
+          description: message,
+          duration: 4000,
+        });
+      }
+    };
 
     login(
       {
@@ -61,7 +181,11 @@ export default function LoginPage() {
       },
       {
         onSuccess: (data) => {
-          toast.success('Login successful!');
+          setIsLoggingIn(false); // Clear loading state immediately
+          toast.success('Login successful!', {
+            description: 'Welcome back! Redirecting to your dashboard...',
+            duration: 3000,
+          });
           
           // Get role from fresh login response
           const role = data?.user?.role;
@@ -77,24 +201,59 @@ export default function LoginPage() {
           }, 100);
         },
         onError: (err) => {
-          // Check if account is suspended (multiple ways to detect)
-          const errorMessage = err?.message || '';
-          const isSuspended = 
-            err?.code === 'ACCOUNT_SUSPENDED' || 
-            err?.name === 'AccountSuspended' ||
-            errorMessage.toLowerCase().includes('suspended') ||
-            errorMessage.toLowerCase().includes('account suspended');
+          // CRITICAL: Clear loading state IMMEDIATELY
+          setIsLoggingIn(false);
           
-          if (isSuspended) {
-            setSuspendedAccount({
-              message: 'Account Suspended',
-              details: errorMessage || 'Your account has been suspended. Please contact support for assistance.',
-            });
-            toast.error('Account Suspended');
+          console.log('[Login Page] Error received from Refine:', err);
+          console.log('[Login Page] Error structure:', JSON.stringify(err, null, 2));
+          console.log('[Login Page] Error type:', typeof err);
+          console.log('[Login Page] Error keys:', Object.keys(err || {}));
+          
+          // CRITICAL: Prevent any page reload or navigation
+          // Show notification IMMEDIATELY before any async operations
+          
+          // Handle different error object structures (Refine might wrap it)
+          // The error could be:
+          // 1. Direct error object from auth provider
+          // 2. Wrapped in err.error
+          // 3. In err.response.data
+          // 4. Direct properties on err
+          
+          let errorToHandle = null;
+          
+          // Try to extract error from various possible structures
+          if (err?.error) {
+            errorToHandle = err.error;
+            console.log('[Login Page] Found error in err.error:', errorToHandle);
+          } else if (err?.response?.data) {
+            errorToHandle = err.response.data;
+            console.log('[Login Page] Found error in err.response.data:', errorToHandle);
+          } else if (err?.code || err?.name || err?.message) {
+            errorToHandle = err;
+            console.log('[Login Page] Using err directly:', errorToHandle);
           } else {
-            setError(errorMessage || 'Invalid credentials');
-            toast.error('Login failed');
+            // Last resort: check if err itself has the structure
+            errorToHandle = err;
+            console.log('[Login Page] Using err as-is (fallback):', errorToHandle);
           }
+          
+          // Now handle the error
+          if (errorToHandle) {
+            console.log('[Login Page] Handling error:', errorToHandle);
+            handleError(errorToHandle);
+          } else {
+            // Fallback: Show generic error notification immediately
+            console.warn('[Login Page] Unexpected error structure, showing generic notification');
+            const genericMessage = err?.message || 'Login failed. Please check your credentials and try again.';
+            setError(genericMessage);
+            toast.error('Login Failed', {
+              description: genericMessage,
+              duration: 5000,
+            });
+          }
+          
+          // Prevent any navigation - return false explicitly
+          return false;
         },
       }
     );
@@ -191,6 +350,7 @@ export default function LoginPage() {
               onClick={() => {
                 setMode('login');
                 setError('');
+                setAccountIssue(null);
               }}
               className={`px-3 py-1 rounded-full border text-xs ${
                 mode === 'login'
@@ -205,6 +365,7 @@ export default function LoginPage() {
               onClick={() => {
                 setMode('register');
                 setError('');
+                setAccountIssue(null);
               }}
               className={`px-3 py-1 rounded-full border text-xs ${
                 mode === 'register'
@@ -218,26 +379,84 @@ export default function LoginPage() {
         </CardHeader>
         
         <CardContent className="pt-4">
-          {/* Suspended Account Warning */}
-          {suspendedAccount && (
-            <div className="mb-4 p-4 rounded-xl bg-gradient-to-br from-red-950/50 to-red-900/30 border border-red-500/30">
+          {/* Account Issue Notification - Professional Display */}
+          {accountIssue && (
+            <div className={`mb-4 p-4 rounded-xl border ${
+              accountIssue.type === 'frozen' 
+                ? 'bg-gradient-to-br from-red-950/50 to-red-900/30 border-red-500/30'
+                : accountIssue.type === 'rejected'
+                ? 'bg-gradient-to-br from-orange-950/50 to-orange-900/30 border-orange-500/30'
+                : accountIssue.type === 'deleted'
+                ? 'bg-gradient-to-br from-gray-950/50 to-gray-900/30 border-gray-500/30'
+                : 'bg-gradient-to-br from-red-950/50 to-red-900/30 border-red-500/30'
+            }`}>
               <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-red-500/20">
-                  <ShieldX className="h-5 w-5 text-red-400" />
+                <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full ${
+                  accountIssue.type === 'frozen'
+                    ? 'bg-red-500/20'
+                    : accountIssue.type === 'rejected'
+                    ? 'bg-orange-500/20'
+                    : accountIssue.type === 'deleted'
+                    ? 'bg-gray-500/20'
+                    : 'bg-red-500/20'
+                }`}>
+                  {accountIssue.type === 'frozen' ? (
+                    <Ban className="h-5 w-5 text-red-400" />
+                  ) : accountIssue.type === 'rejected' ? (
+                    <XCircle className="h-5 w-5 text-orange-400" />
+                  ) : accountIssue.type === 'deleted' ? (
+                    <AlertCircle className="h-5 w-5 text-gray-400" />
+                  ) : (
+                    <ShieldX className="h-5 w-5 text-red-400" />
+                  )}
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-semibold text-red-400 text-sm">{suspendedAccount.message}</h3>
-                  <p className="mt-1 text-xs text-red-300/80">{suspendedAccount.details}</p>
-                  <div className="mt-3 flex items-center gap-2 text-xs text-gray-400">
-                    <Phone className="h-3 w-3" />
-                    <span>Contact support: <a href="mailto:support@fxwallet.com" className="text-amber-400 hover:underline">support@fxwallet.com</a></span>
-                  </div>
+                  <h3 className={`font-semibold text-sm ${
+                    accountIssue.type === 'frozen'
+                      ? 'text-red-400'
+                      : accountIssue.type === 'rejected'
+                      ? 'text-orange-400'
+                      : accountIssue.type === 'deleted'
+                      ? 'text-gray-400'
+                      : 'text-red-400'
+                  }`}>
+                    {accountIssue.message}
+                  </h3>
+                  <p className={`mt-1 text-xs ${
+                    accountIssue.type === 'frozen'
+                      ? 'text-red-300/80'
+                      : accountIssue.type === 'rejected'
+                      ? 'text-orange-300/80'
+                      : accountIssue.type === 'deleted'
+                      ? 'text-gray-300/80'
+                      : 'text-red-300/80'
+                  }`}>
+                    {accountIssue.details}
+                  </p>
+                  {(accountIssue.type === 'frozen' || accountIssue.type === 'rejected' || accountIssue.type === 'deleted') && (
+                    <div className="mt-3 space-y-2">
+                      <div className="flex items-center gap-2 text-xs text-gray-400">
+                        <Phone className="h-3 w-3" />
+                        <span>Contact support: <a href="mailto:support@fxwallet.com" className="text-amber-400 hover:underline">support@fxwallet.com</a></span>
+                      </div>
+                      <Link href="/wallet/support">
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="w-full mt-2 bg-amber-500 hover:bg-amber-600 text-gray-900 text-xs h-8"
+                        >
+                          <Mail className="h-3 w-3 mr-2" />
+                          Submit Support Request
+                        </Button>
+                      </Link>
+                    </div>
+                  )}
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => setSuspendedAccount(null)}
-                className="mt-3 w-full text-xs text-gray-500 hover:text-gray-400"
+                onClick={() => setAccountIssue(null)}
+                className="mt-3 w-full text-xs text-gray-500 hover:text-gray-400 transition-colors"
               >
                 Try another account
               </button>
@@ -245,9 +464,9 @@ export default function LoginPage() {
           )}
 
           {mode === 'login' ? (
-            <form onSubmit={handleLoginSubmit} className="space-y-4">
+            <form onSubmit={handleLoginSubmit} className="space-y-4" noValidate>
               {/* Error message */}
-              {error && !suspendedAccount && (
+              {error && !accountIssue && (
                 <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
                   <AlertCircle className="h-4 w-4 flex-shrink-0" />
                   {error}
@@ -301,6 +520,23 @@ export default function LoginPage() {
                   'Sign in'
                 )}
               </Button>
+
+              {/* Test Notification Button (for debugging) */}
+              <div className="pt-2 pb-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    console.log('[Test] Showing test notification');
+                    toast.error('Test Notification', {
+                      description: 'If you see this, notifications are working!',
+                      duration: 3000,
+                    });
+                  }}
+                  className="w-full text-xs text-gray-500 hover:text-gray-400 underline"
+                >
+                  Test Notification (Click to verify notifications work)
+                </button>
+              </div>
 
               {/* Demo credentials */}
               <div className="pt-4 border-t border-gray-800">

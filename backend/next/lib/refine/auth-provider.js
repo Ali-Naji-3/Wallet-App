@@ -12,13 +12,45 @@ const isSuspendedError = (error) => {
 // Helper: Get error response data
 const getErrorData = (error) => {
   const responseData = error.response?.data || {};
-  const isSuspended = isSuspendedError(error);
-  return {
-    name: isSuspended ? 'AccountSuspended' : 'LoginError',
+  const errorCode = responseData.code;
+  const statusCode = error.response?.status;
+  
+  // Debug logging
+  console.log('[Auth Provider] Error data:', {
+    errorCode,
+    statusCode,
+    responseData,
+    message: responseData.message,
+    details: responseData.details,
+  });
+  
+  // Map error codes to appropriate error names
+  let errorName = 'LoginError';
+  if (errorCode === 'ACCOUNT_SUSPENDED' || errorCode === 'ACCOUNT_FROZEN') {
+    errorName = 'AccountFrozen';
+  } else if (errorCode === 'ACCOUNT_REJECTED') {
+    errorName = 'AccountRejected';
+  } else if (errorCode === 'ACCOUNT_DELETED') {
+    errorName = 'AccountDeleted';
+  } else if (errorCode === 'INVALID_EMAIL') {
+    errorName = 'InvalidEmail';
+  } else if (errorCode === 'INVALID_PASSWORD') {
+    errorName = 'InvalidPassword';
+  } else if (statusCode === 403) {
+    // Default to frozen if 403 and no specific code
+    errorName = 'AccountFrozen';
+  }
+  
+  const errorData = {
+    name: errorName,
     message: responseData.details || responseData.message || responseData.error || 'Login failed',
-    code: responseData.code || (isSuspended ? 'ACCOUNT_SUSPENDED' : undefined),
-    contactSupport: responseData.contactSupport || isSuspended,
+    code: errorCode || (statusCode === 403 ? 'ACCOUNT_SUSPENDED' : undefined),
+    contactSupport: responseData.contactSupport || statusCode === 403,
+    kycRejected: responseData.kycRejected || false,
   };
+  
+  console.log('[Auth Provider] Returning error data:', errorData);
+  return errorData;
 };
 
 // Helper: Fetch and update user data from backend
@@ -43,14 +75,18 @@ export const authProvider = {
       const { data } = await apiClient.post(ENDPOINTS.AUTH.LOGIN, { email, password });
 
       if (!data.token) {
-        return { success: false, error: { name: 'LoginError', message: 'Invalid email or password' } };
+        const error = { name: 'LoginError', message: 'Invalid email or password' };
+        console.log('[Auth] Login failed - no token:', error);
+        clearAuthData();
+        throw error;
       }
 
       // Verify email matches (case-insensitive)
       if (data.user?.email?.toLowerCase() !== email.toLowerCase()) {
         console.error('[Auth] Email mismatch!', { loginEmail: email, returnedEmail: data.user.email });
         clearAuthData();
-        return { success: false, error: { name: 'LoginError', message: 'Authentication error: User data mismatch' } };
+        const error = { name: 'LoginError', message: 'Authentication error: User data mismatch' };
+        throw error;
       }
       
       console.log('[Auth] Login successful:', data.user.email, 'Role:', data.user.role);
@@ -67,8 +103,25 @@ export const authProvider = {
         user: data.user,
       };
     } catch (error) {
+      console.log('[Auth] Login error caught:', error);
       clearAuthData();
-      return { success: false, error: getErrorData(error) };
+      
+      // Get properly formatted error data
+      const errorData = getErrorData(error);
+      
+      // CRITICAL: Throw the error so Refine's useLogin can catch it in onError
+      // This ensures the error propagates correctly to the login page's onError handler
+      const errorToThrow = {
+        name: errorData.name,
+        message: errorData.message,
+        code: errorData.code,
+        details: errorData.message,
+        response: error.response, // Preserve original response for detailed error handling
+        ...errorData, // Include all error data
+      };
+      
+      console.log('[Auth] Throwing error for useLogin:', errorToThrow);
+      throw errorToThrow;
     }
   },
 

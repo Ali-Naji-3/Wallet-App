@@ -58,26 +58,35 @@ apiClient.interceptors.response.use(
       // Token expired or invalid
       if (typeof window !== 'undefined') {
         const isOnLoginPage = window.location.pathname.includes('/login');
+        const isLoginEndpoint = error.config?.url?.includes('/api/auth/login');
         
-        // Only log warning if not on login page (expected 401s on login page)
-        if (!isOnLoginPage) {
-        console.warn('[API Client] 401 Unauthorized - clearing token and redirecting to login');
-        }
-        
-        clearAuthData();
-        
-        // Only redirect if not already on login page
-        if (!isOnLoginPage) {
+        // CRITICAL: Don't redirect or clear data on login page or login endpoint
+        // The login page needs to handle the error itself
+        if (!isOnLoginPage && !isLoginEndpoint) {
+          console.warn('[API Client] 401 Unauthorized - clearing token and redirecting to login');
+          clearAuthData();
           window.location.href = '/login';
+        } else {
+          // On login page or login endpoint - don't interfere
+          // Just let the error pass through so login page can handle it
+          console.log('[API Client] 401 on login - letting login page handle error');
         }
       }
     } else if (isSuspended) {
-      // IMPORTANT: Only log out if this is a /me or /auth endpoint (user's own account)
-      // Don't log out for 403s from admin actions like rejecting other users' KYC
+      // IMPORTANT: Handle 403 errors carefully
+      const isOnLoginPage = typeof window !== 'undefined' && window.location.pathname.includes('/login');
+      const isLoginEndpoint = error.config?.url?.includes('/api/auth/login');
       const isAuthEndpoint = error.config?.url?.includes('/api/auth/me') || 
                             error.config?.url?.includes('/api/admin/notifications/stream');
       
-      if (isAuthEndpoint && typeof window !== 'undefined') {
+      // CRITICAL: If this is a login attempt (403 from /api/auth/login), 
+      // DON'T clear auth data or redirect - let the login page handle it
+      if (isLoginEndpoint || isOnLoginPage) {
+        console.log('[API Client] 403 on login endpoint - letting login page handle error');
+        // Just reject the promise - don't interfere
+        // The login page's onError handler will show the notification
+      } else if (isAuthEndpoint && typeof window !== 'undefined') {
+        // This is an authenticated user whose account was suspended
         console.warn('[API Client] 403 Account Suspended - clearing auth data');
         clearAuthData();
         

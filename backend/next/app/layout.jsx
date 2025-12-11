@@ -34,7 +34,16 @@ export default function RootLayout({ children }) {
       >
         <RefineProvider>
         {children}
-          <Toaster />
+          <Toaster 
+            position="top-right" 
+            richColors 
+            closeButton 
+            toastOptions={{
+              style: {
+                zIndex: 9999,
+              },
+            }}
+          />
         </RefineProvider>
       </body>
     </html>
