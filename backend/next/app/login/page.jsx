@@ -420,7 +420,7 @@ export default function LoginPage() {
                   ) : accountIssue.type === 'deleted' ? (
                     <AlertCircle className="h-5 w-5 text-gray-400" />
                   ) : (
-                    <ShieldX className="h-5 w-5 text-red-400" />
+                  <ShieldX className="h-5 w-5 text-red-400" />
                   )}
                 </div>
                 <div className="flex-1">
@@ -449,9 +449,9 @@ export default function LoginPage() {
                   {(accountIssue.type === 'frozen' || accountIssue.type === 'rejected' || accountIssue.type === 'deleted') && (
                     <div className="mt-3 space-y-2">
                       <div className="flex items-center gap-2 text-xs text-gray-400">
-                        <Phone className="h-3 w-3" />
-                        <span>Contact support: <a href="mailto:support@fxwallet.com" className="text-amber-400 hover:underline">support@fxwallet.com</a></span>
-                      </div>
+                    <Phone className="h-3 w-3" />
+                    <span>Contact support: <a href="mailto:support@fxwallet.com" className="text-amber-400 hover:underline">support@fxwallet.com</a></span>
+                  </div>
                       <Button
                         type="button"
                         size="sm"

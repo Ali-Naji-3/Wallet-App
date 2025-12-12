@@ -135,20 +135,6 @@ export default function WalletDashboard() {
       </TabsList>
 
       <TabsContent value="overview" className="space-y-8">
-      {/* Welcome Section */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Welcome back! 👋</h1>
-          <p className="text-slate-600 dark:text-slate-400 mt-1">Here's your wallet overview</p>
-        </div>
-        <Link href="/wallet/send">
-          <Button className="bg-emerald-500 hover:bg-emerald-600 text-white">
-            <Send className="h-4 w-4 mr-2" />
-            Send Money
-          </Button>
-        </Link>
-      </div>
-
       {/* Premium Hero Balance Card - Dynamic Card Style */}
       <Card className={`bg-gradient-to-br ${heroCard.cardColor} border-0 overflow-hidden relative shadow-2xl transition-all duration-500`}>
         <CardContent className="p-8">

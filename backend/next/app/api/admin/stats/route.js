@@ -41,15 +41,17 @@ export async function GET(req) {
         COUNT(*) as totalTransactions,
         SUM(CASE WHEN type = 'exchange' THEN 1 ELSE 0 END) as totalExchanges,
         SUM(CASE WHEN type = 'transfer' THEN 1 ELSE 0 END) as totalTransfers,
-        SUM(CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR) THEN 1 ELSE 0 END) as txLast24Hours
+        SUM(CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR) THEN 1 ELSE 0 END) as txLast24Hours,
+        COALESCE(SUM(source_amount), 0) as totalVolume
       FROM transactions
     `);
 
-    // Wallet stats
+    // Wallet stats - Active wallets are those with balance > 0
     const [walletStats] = await pool.query(`
       SELECT 
         COUNT(*) as totalWallets,
-        SUM(balance) as totalBalance
+        COUNT(CASE WHEN balance > 0 THEN 1 END) as activeWallets,
+        COALESCE(SUM(balance), 0) as totalBalance
       FROM wallets
     `);
 
