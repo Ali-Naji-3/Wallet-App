@@ -322,16 +322,29 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
-      {/* Background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 via-gray-950 to-purple-500/5" />
+    <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Animated Gradient Mesh Background */}
+      <div className="absolute inset-0 overflow-hidden">
+        {/* Large gradient orbs with smooth animation */}
+        <div className="absolute top-0 -left-4 w-96 h-96 bg-amber-500/20 rounded-full blur-3xl animate-blob" />
+        <div className="absolute top-0 -right-4 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-blob animation-delay-2000" />
+        <div className="absolute -bottom-8 left-1/2 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-blob animation-delay-4000" />
+        
+        {/* Secondary smaller orbs for depth */}
+        <div className="absolute top-1/4 right-1/4 w-64 h-64 bg-amber-400/10 rounded-full blur-2xl animate-blob" />
+        <div className="absolute bottom-1/4 left-1/4 w-64 h-64 bg-purple-400/10 rounded-full blur-2xl animate-blob animation-delay-4000" />
+        
+        {/* Subtle noise overlay for texture */}
+        <div className="absolute inset-0 bg-noise opacity-[0.015]" />
+      </div>
       
-      <Card className="w-full max-w-md bg-gray-900 border-gray-800 relative z-10">
+      {/* Glassmorphism Card */}
+      <Card className="w-full max-w-md bg-gray-900/80 backdrop-blur-xl border-gray-800/50 relative z-10 shadow-2xl shadow-black/50">
         <CardHeader className="text-center pb-2">
           {/* Logo */}
           <div className="flex justify-center mb-4">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 shadow-lg shadow-amber-500/25">
-              <Wallet className="h-8 w-8 text-gray-900" />
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 transition-all duration-300 transform hover:scale-105">
+              <Wallet className="h-8 w-8 text-gray-900 transition-transform duration-300 hover:rotate-12" />
             </div>
           </div>
           <CardTitle className="text-2xl font-bold text-white">
@@ -352,10 +365,10 @@ export default function LoginPage() {
                 setError('');
                 setAccountIssue(null);
               }}
-              className={`px-3 py-1 rounded-full border text-xs ${
+              className={`px-3 py-1 rounded-full border text-xs transition-all duration-300 ${
                 mode === 'login'
-                  ? 'border-amber-500 bg-amber-500/10 text-amber-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-300'
+                  ? 'border-amber-500 bg-amber-500/10 text-amber-400 shadow-lg shadow-amber-500/20'
+                  : 'border-transparent text-gray-500 hover:text-gray-300 hover:border-gray-600'
               }`}
             >
               Sign in
@@ -367,10 +380,10 @@ export default function LoginPage() {
                 setError('');
                 setAccountIssue(null);
               }}
-              className={`px-3 py-1 rounded-full border text-xs ${
+              className={`px-3 py-1 rounded-full border text-xs transition-all duration-300 ${
                 mode === 'register'
-                  ? 'border-amber-500 bg-amber-500/10 text-amber-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-300'
+                  ? 'border-amber-500 bg-amber-500/10 text-amber-400 shadow-lg shadow-amber-500/20'
+                  : 'border-transparent text-gray-500 hover:text-gray-300 hover:border-gray-600'
               }`}
             >
               Register
@@ -478,7 +491,7 @@ export default function LoginPage() {
             <form onSubmit={handleLoginSubmit} className="space-y-4" noValidate>
               {/* Error message */}
               {error && !accountIssue && (
-                <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm backdrop-blur-sm animate-in fade-in slide-in-from-top-2 duration-300">
                   <AlertCircle className="h-4 w-4 flex-shrink-0" />
                   {error}
                 </div>
@@ -495,7 +508,7 @@ export default function LoginPage() {
                     placeholder="admin@admin.com"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="pl-10 bg-gray-800 border-gray-700 text-white placeholder-gray-500 focus:ring-amber-500 focus:border-amber-500"
+                    className="pl-10 bg-gray-800/50 backdrop-blur-sm border-gray-700/50 text-white placeholder-gray-500 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all duration-300 hover:border-gray-600"
                   />
                 </div>
               </div>
@@ -511,7 +524,7 @@ export default function LoginPage() {
                     placeholder="••••••••"
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="pl-10 bg-gray-800 border-gray-700 text-white placeholder-gray-500 focus:ring-amber-500 focus:border-amber-500"
+                    className="pl-10 bg-gray-800/50 backdrop-blur-sm border-gray-700/50 text-white placeholder-gray-500 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all duration-300 hover:border-gray-600"
                   />
                 </div>
               </div>
@@ -520,7 +533,7 @@ export default function LoginPage() {
               <Button
                 type="submit"
                 disabled={isLoading}
-                className="w-full bg-amber-500 hover:bg-amber-600 text-gray-900 font-semibold h-11"
+                className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-gray-900 font-semibold h-11 shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98]"
               >
                 {isLoading ? (
                   <>
@@ -570,7 +583,7 @@ export default function LoginPage() {
             <form onSubmit={handleRegisterSubmit} className="space-y-4">
               {/* Error message */}
               {error && (
-                <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm backdrop-blur-sm animate-in fade-in slide-in-from-top-2 duration-300">
                   <AlertCircle className="h-4 w-4 flex-shrink-0" />
                   {error}
                 </div>
@@ -585,7 +598,7 @@ export default function LoginPage() {
                   placeholder="John Doe"
                   value={registerData.fullName}
                   onChange={(e) => setRegisterData({ ...registerData, fullName: e.target.value })}
-                  className="bg-gray-800 border-gray-700 text-white placeholder-gray-500 focus:ring-amber-500 focus:border-amber-500"
+                  className="bg-gray-800/50 backdrop-blur-sm border-gray-700/50 text-white placeholder-gray-500 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all duration-300 hover:border-gray-600"
                 />
               </div>
 
@@ -600,7 +613,7 @@ export default function LoginPage() {
                     placeholder="you@example.com"
                     value={registerData.email}
                     onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
-                    className="pl-10 bg-gray-800 border-gray-700 text-white placeholder-gray-500 focus:ring-amber-500 focus:border-amber-500"
+                    className="pl-10 bg-gray-800/50 backdrop-blur-sm border-gray-700/50 text-white placeholder-gray-500 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all duration-300 hover:border-gray-600"
                   />
                 </div>
               </div>
@@ -616,7 +629,7 @@ export default function LoginPage() {
                     placeholder="••••••••"
                     value={registerData.password}
                     onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
-                    className="pl-10 bg-gray-800 border-gray-700 text-white placeholder-gray-500 focus:ring-amber-500 focus:border-amber-500"
+                    className="pl-10 bg-gray-800/50 backdrop-blur-sm border-gray-700/50 text-white placeholder-gray-500 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all duration-300 hover:border-gray-600"
                   />
                 </div>
               </div>
@@ -630,7 +643,7 @@ export default function LoginPage() {
                   placeholder="••••••••"
                   value={registerData.confirmPassword}
                   onChange={(e) => setRegisterData({ ...registerData, confirmPassword: e.target.value })}
-                  className="bg-gray-800 border-gray-700 text-white placeholder-gray-500 focus:ring-amber-500 focus:border-amber-500"
+                  className="bg-gray-800/50 backdrop-blur-sm border-gray-700/50 text-white placeholder-gray-500 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all duration-300 hover:border-gray-600"
                 />
               </div>
 
@@ -638,7 +651,7 @@ export default function LoginPage() {
               <Button
                 type="submit"
                 disabled={isRegistering}
-                className="w-full bg-amber-500 hover:bg-amber-600 text-gray-900 font-semibold h-11"
+                className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-gray-900 font-semibold h-11 shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98]"
               >
                 {isRegistering ? (
                   <>
