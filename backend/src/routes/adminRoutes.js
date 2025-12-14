@@ -9,6 +9,7 @@ import {
   listAllTransactions,
   getAdminStats,
   promoteToAdmin,
+  creditUserWallet,
 } from '../controllers/adminController.js';
 
 const router = express.Router();
@@ -29,6 +30,9 @@ router.post('/users/:id/promote', promoteToAdmin);
 
 // Transaction monitoring
 router.get('/transactions', listAllTransactions);
+
+// Wallet management (DEMO/TEST ONLY)
+router.post('/credit-wallet', creditUserWallet);
 
 export default router;
 

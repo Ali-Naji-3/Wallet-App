@@ -207,7 +207,8 @@ export function useUserNotifications(options = {}) {
   // Mark as read
   const markAsRead = useCallback(async (notificationId) => {
     try {
-      await apiClient.post('/api/notifications/my', { notificationId });
+      // Use RESTful endpoint: POST /api/notifications/{id}/read
+      await apiClient.post(`/api/notifications/${notificationId}/read`);
       setNotifications(prev =>
         prev.map(n => n.id === notificationId ? { ...n, is_read: 1 } : n)
       );
@@ -221,7 +222,8 @@ export function useUserNotifications(options = {}) {
   // Mark all as read
   const markAllAsRead = useCallback(async () => {
     try {
-      await apiClient.post('/api/notifications/my', { markAllRead: true });
+      // Use dedicated mark-all-read endpoint
+      await apiClient.post('/api/notifications/mark-all-read');
       setNotifications(prev => prev.map(n => ({ ...n, is_read: 1 })));
       setUnreadCount(0);
     } catch (err) {

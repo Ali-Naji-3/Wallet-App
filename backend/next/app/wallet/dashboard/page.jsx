@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -93,25 +94,26 @@ function formatTxTime(iso) {
 }
 
 function mapTxToRecent(tx) {
-  // tx.type: 'send' | 'exchange' | 'receive' (حسب DB)
-  const type = tx.type === 'send' ? 'sent' : tx.type === 'receive' ? 'received' : 'exchange';
+  // Map database transaction types: 'exchange' or 'transfer'
+  const type = tx.type === 'exchange' ? 'exchange' : tx.type === 'transfer' ? 'sent' : 'exchange';
 
-  // اسم/وصف يظهر بالدashboard
-  const name =
-    tx.type === 'send'
-      ? (tx.recipient_name || tx.recipient_email || 'Send')
-      : tx.type === 'receive'
-      ? (tx.recipient_name || tx.recipient_email || 'Receive')
-      : (tx.from_currency && tx.to_currency ? `${tx.from_currency} → ${tx.to_currency}` : 'Exchange');
+  const name = tx.type === 'exchange' 
+    ? (tx.from_currency && tx.to_currency ? `${tx.from_currency} → ${tx.to_currency}` : 'Exchange')
+    : (tx.note || 'Transfer');
 
-  // amount display
-  // في جدولك: from_currency/from_amount + to_currency/to_amount
   const fromCur = tx.from_currency || '';
   const fromAmt = safeNumber(tx.from_amount);
+  const toCur = tx.to_currency || '';
+  const toAmt = safeNumber(tx.to_amount);
 
-  let amountText = `${fromCur} ${fromAmt.toFixed(2)}`;
-  if (tx.type === 'send') amountText = `-${WALLET_UI[fromCur]?.symbol || ''}${fromAmt.toFixed(2)}`;
-  if (tx.type === 'receive') amountText = `+${WALLET_UI[fromCur]?.symbol || ''}${fromAmt.toFixed(2)}`;
+  let amountText = '';
+  if (tx.type === 'exchange') {
+    // Show both currencies for exchange
+    amountText = `${fromCur} ${fromAmt.toFixed(2)} → ${toCur} ${toAmt.toFixed(2)}`;
+  } else if (tx.type === 'transfer') {
+    // Show sent amount with minus sign
+    amountText = `-${WALLET_UI[fromCur]?.symbol || ''}${fromAmt.toFixed(2)}`;
+  }
 
   return {
     id: tx.id,
@@ -124,6 +126,10 @@ function mapTxToRecent(tx) {
 }
 
 export default function WalletDashboard() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const creditedCurrency = searchParams.get('currency'); // e.g., ?currency=USD
+  
   const [balanceVisible, setBalanceVisible] = useState(true);
   const [heroCardIndex, setHeroCardIndex] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -135,7 +141,10 @@ export default function WalletDashboard() {
 
   const fetchAll = async () => {
     const balancesUrl = ENDPOINTS?.WALLETS?.BALANCES || '/api/wallets/balances';
-    const txUrl = ENDPOINTS?.TRANSACTIONS?.MY || '/api/transactions';
+    const txUrl = ENDPOINTS?.TRANSACTIONS?.MY || '/api/transactions/my';
+
+    console.log('[Dashboard] Fetching balances from:', balancesUrl);
+    console.log('[Dashboard] Fetching transactions from:', txUrl);
 
     const [bRes, tRes] = await Promise.all([
       apiClient.get(balancesUrl),
@@ -145,7 +154,9 @@ export default function WalletDashboard() {
     const balancesRaw = bRes?.data?.balances || [];
     const txRaw = tRes?.data?.transactions || [];
 
-    // balancesRaw: [{ currency, balance }]
+    console.log('[Dashboard] Balances received:', balancesRaw.length);
+    console.log('[Dashboard] Transactions received:', txRaw.length);
+
     const mappedBalances = balancesRaw
       .map((w) => {
         const ui = WALLET_UI[w.currency] || {
@@ -165,20 +176,37 @@ export default function WalletDashboard() {
           balance: safeNumber(w.balance),
         };
       })
-      // ترتيب ثابت: USD, EUR, LBP
       .sort((a, b) => {
         const order = { USD: 1, EUR: 2, LBP: 3 };
         return (order[a.currency] || 99) - (order[b.currency] || 99);
       });
 
-    // recent txs
     const mappedTx = txRaw.slice(0, 5).map(mapTxToRecent);
 
     setWalletBalances(mappedBalances);
     setRecentTransactions(mappedTx);
 
-    // تأكد heroCardIndex ما يطلع out of range
-    setHeroCardIndex((idx) => (mappedBalances.length ? Math.min(idx, mappedBalances.length - 1) : 0));
+    console.log('[Dashboard] Mapped balances:', mappedBalances.map(b => ({ currency: b.currency, balance: b.balance })));
+
+    // Activate currency card based on query param or first wallet with balance
+    if (creditedCurrency) {
+      const creditedIndex = mappedBalances.findIndex(w => w.currency === creditedCurrency);
+      if (creditedIndex >= 0) {
+        setHeroCardIndex(creditedIndex);
+        console.log(`[Dashboard] ✅ Activated ${creditedCurrency} card (index ${creditedIndex}) from query param`);
+      } else {
+        console.log(`[Dashboard] ⚠️ Currency ${creditedCurrency} not found in balances`);
+      }
+    } else {
+      // Find first wallet with balance > 0
+      const firstWithBalance = mappedBalances.findIndex(w => w.balance > 0);
+      if (firstWithBalance >= 0) {
+        setHeroCardIndex(firstWithBalance);
+        console.log(`[Dashboard] ✅ Auto-activated ${mappedBalances[firstWithBalance].currency} card (first with balance > 0)`);
+      } else {
+        console.log('[Dashboard] ℹ️ No wallets with balance > 0, using first card');
+      }
+    }
   };
 
   useEffect(() => {
@@ -188,7 +216,7 @@ export default function WalletDashboard() {
         await fetchAll();
       } catch (err) {
         console.error('[Dashboard] fetch error:', err);
-        // fallback بسيط إذا فشل
+        console.error('[Dashboard] Error details:', err.response?.status, err.response?.data);
         setWalletBalances([
           { ...WALLET_UI.USD, balance: 0 },
           { ...WALLET_UI.EUR, balance: 0 },
@@ -200,7 +228,7 @@ export default function WalletDashboard() {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [creditedCurrency]); // Re-fetch when currency query param changes
 
   const totalBalance = useMemo(() => {
     return walletBalances.reduce((sum, w) => {
@@ -257,7 +285,7 @@ export default function WalletDashboard() {
       </TabsList>
 
       <TabsContent value="overview" className="space-y-8">
-        {/* Welcome */}
+        {/* Welcome Section */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Welcome back! 👋</h1>
@@ -274,10 +302,12 @@ export default function WalletDashboard() {
           </Link>
         </div>
 
-        {/* Hero Card */}
-        <Card className={`bg-gradient-to-br ${heroCard.cardColor} border-0 overflow-hidden relative shadow-2xl transition-all duration-500`}>
+        {/* Premium Hero Balance Card - SINGLE INSTANCE */}
+        <Card className={`bg-gradient-to-br ${heroCard.cardColor} border-0 overflow-hidden relative shadow-2xl transition-all duration-500 ${
+          creditedCurrency === heroCard.currency ? 'ring-4 ring-emerald-400 ring-offset-4 ring-offset-slate-900 animate-pulse' : ''
+        }`}>
           <CardContent className="p-8">
-            {/* Decorative */}
+            {/* Decorative elements */}
             {heroCard.cardType === 'BLACK' ? (
               <>
                 <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
@@ -294,9 +324,9 @@ export default function WalletDashboard() {
                 <div className="absolute bottom-0 left-0 w-48 h-48 bg-slate-600/20 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2" />
               </>
             )}
-
+            
             <div className="relative z-10">
-              {/* Header */}
+              {/* Header with controls */}
               <div className="flex items-center justify-between mb-8">
                 <div className="flex items-center gap-2">
                   {(() => {
@@ -306,7 +336,6 @@ export default function WalletDashboard() {
                   <span className={`text-sm font-semibold ${heroCard.textColor} opacity-70`}>FXWallet {heroCard.cardType}</span>
                   <span className={`text-xs ${heroCard.textColor} opacity-50`}>• {heroCard.currency}</span>
                 </div>
-
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setBalanceVisible(!balanceVisible)}
@@ -321,7 +350,6 @@ export default function WalletDashboard() {
                       <EyeOff className={`h-5 w-5 ${heroCard.textColor} opacity-80`} />
                     )}
                   </button>
-
                   <button
                     onClick={handleRefresh}
                     disabled={isRefreshing}
@@ -381,7 +409,7 @@ export default function WalletDashboard() {
                 </div>
               </div>
 
-              {/* Sparkline (UI only) */}
+              {/* Sparkline */}
               <div className={`relative h-24 backdrop-blur-sm rounded-2xl p-4 overflow-hidden border ${
                 heroCard.cardType === 'BLACK'
                   ? 'bg-white/5 border-white/10'
@@ -459,9 +487,13 @@ export default function WalletDashboard() {
                 <button
                   key={wallet.currency}
                   onClick={() => handleCardClick(originalIndex)}
-                  className="flex-shrink-0 w-80 transition-all duration-300 scale-100 opacity-70 hover:opacity-90 hover:scale-105"
+                  className={`flex-shrink-0 w-80 transition-all duration-300 scale-100 hover:opacity-90 hover:scale-105 ${
+                    creditedCurrency === wallet.currency ? 'opacity-100 ring-2 ring-emerald-400' : 'opacity-70'
+                  }`}
                 >
-                  <div className={`bg-gradient-to-br ${wallet.cardColor} rounded-2xl p-6 shadow-2xl relative overflow-hidden h-48 border-2 border-transparent hover:border-white/20 transition-all`}>
+                  <div className={`bg-gradient-to-br ${wallet.cardColor} rounded-2xl p-6 shadow-2xl relative overflow-hidden h-48 border-2 transition-all ${
+                    creditedCurrency === wallet.currency ? 'border-emerald-400' : 'border-transparent hover:border-white/20'
+                  }`}>
                     <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl translate-x-8 -translate-y-8" />
                     <div className="absolute bottom-0 left-0 w-24 h-24 bg-black/10 rounded-full blur-xl -translate-x-4 translate-y-4" />
 

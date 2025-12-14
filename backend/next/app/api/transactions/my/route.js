@@ -27,15 +27,13 @@ export async function GET(req) {
       `SELECT 
         id,
         type,
-        from_currency,
-        to_currency,
-        from_amount,
-        to_amount,
-        recipient_email,
-        recipient_name,
+        source_currency as from_currency,
+        target_currency as to_currency,
+        source_amount as from_amount,
+        target_amount as to_amount,
         note,
-        status,
-        created_at
+        created_at,
+        'completed' as status
        FROM transactions 
        WHERE user_id = ?
        ORDER BY created_at DESC

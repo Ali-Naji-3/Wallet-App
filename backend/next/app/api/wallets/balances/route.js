@@ -22,25 +22,26 @@ export async function GET(req) {
 
     // Get all wallet balances
     const [wallets] = await pool.query(
-      `SELECT currency, balance 
+      `SELECT currency_code as currency, balance 
        FROM wallets 
        WHERE user_id = ?
-       ORDER BY currency`,
+       ORDER BY currency_code`,
       [user.id]
     );
 
-    // If user has no wallets, create default ones
+    // If user has no wallets, create default ones with 0 balance
     if (wallets.length === 0) {
       const defaultWallets = [
-        { currency: 'USD', balance: 12450.00 },
-        { currency: 'EUR', balance: 8320.50 },
-        { currency: 'LBP', balance: 450000000 },
+        { currency: 'USD', balance: 0.00 },
+        { currency: 'EUR', balance: 0.00 },
+        { currency: 'LBP', balance: 0.00 },
       ];
 
       for (const wallet of defaultWallets) {
+        const address = `FXW-${wallet.currency}-${Math.random().toString(36).slice(2, 10).toUpperCase()}`;
         await pool.query(
-          `INSERT INTO wallets (user_id, currency, balance) VALUES (?, ?, ?)`,
-          [user.id, wallet.currency, wallet.balance]
+          `INSERT INTO wallets (user_id, currency_code, address, balance) VALUES (?, ?, ?, ?)`,
+          [user.id, wallet.currency, address, wallet.balance]
         );
       }
 
