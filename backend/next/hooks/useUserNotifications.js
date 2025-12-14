@@ -154,31 +154,44 @@ export function useUserNotifications(options = {}) {
               break;
           }
         } catch (err) {
-          console.error('[useUserNotifications] Parse error:', err);
+          // Only log parse errors in development
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('[useUserNotifications] Failed to parse notification data:', err.message);
+          }
         }
       };
       
       eventSource.onerror = (err) => {
-        console.error('[useUserNotifications] Connection error');
+        // Only log error on first failure or every 5th attempt to reduce console spam
+        if (reconnectAttempts.current === 0 || reconnectAttempts.current % 5 === 0) {
+          console.warn('[useUserNotifications] SSE connection error - this is normal if notifications endpoint is not available');
+        }
+        
         setConnected(false);
         isConnectingRef.current = false;
         
         // Don't reconnect if component is unmounted
         if (!mountedRef.current) {
-          console.log('[useUserNotifications] Component unmounted, not reconnecting');
           return;
         }
         
-        // Auto-reconnect with exponential backoff
+        // Auto-reconnect with exponential backoff (max 5 attempts)
         if (reconnectAttempts.current < maxReconnectAttempts) {
           reconnectAttempts.current += 1;
           const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000);
           
-          console.log(`[useUserNotifications] Reconnecting in ${delay}ms (${reconnectAttempts.current}/${maxReconnectAttempts})`);
+          // Only log reconnect attempts occasionally
+          if (reconnectAttempts.current <= 2) {
+            console.log(`[useUserNotifications] Will retry connection in ${Math.round(delay/1000)}s (attempt ${reconnectAttempts.current}/${maxReconnectAttempts})`);
+          }
           
           reconnectTimeoutRef.current = setTimeout(() => {
             connect();
           }, delay);
+        } else {
+          // Max retries reached - fail silently
+          console.log('[useUserNotifications] Max reconnection attempts reached. Notifications will not update in real-time.');
+          setError('Real-time notifications unavailable');
         }
       };
       
