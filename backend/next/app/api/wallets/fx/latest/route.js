@@ -1,150 +1,126 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
 import { parseBearer, verifyToken } from '@/lib/auth';
 
-// Fallback static rates in case API fails
-const FALLBACK_RATES = {
-  USD: { EUR: 0.92, GBP: 0.79, JPY: 149.50, CHF: 0.88, CAD: 1.36, AUD: 1.53 },
-  EUR: { USD: 1.09, GBP: 0.86, JPY: 162.50, CHF: 0.96, CAD: 1.48, AUD: 1.66 },
-  GBP: { USD: 1.27, EUR: 1.16, JPY: 189.00, CHF: 1.11, CAD: 1.72, AUD: 1.93 },
-  JPY: { USD: 0.0067, EUR: 0.0062, GBP: 0.0053, CHF: 0.0059, CAD: 0.0091, AUD: 0.0102 },
+// Exchange rates (USD base)
+const exchangeRates = {
+  USD: 1,
+  EUR: 1.09,
+  LBP: 0.0000112,
 };
 
-async function fetchAndStoreLatestRates(baseCurrency) {
-  const pool = getPool();
-  
-  try {
-    // Try free API: frankfurter.app (European Central Bank rates)
-    const url = `https://api.frankfurter.app/latest?from=${encodeURIComponent(baseCurrency)}`;
-    const res = await fetch(url, { 
-      signal: AbortSignal.timeout(5000) // 5 second timeout
-    });
-    
-    if (!res.ok) {
-      throw new Error(`API returned ${res.status}`);
-    }
-    
-    const data = await res.json();
-    
-    if (!data || !data.rates) {
-      throw new Error('Invalid FX response structure');
-    }
-    
-    // Add the base currency with rate 1
-    const rates = { ...data.rates, [baseCurrency]: 1 };
-    
-    // Save to database
-    const fetchedAt = new Date();
-    const entries = Object.entries(rates).map(([quote, rate]) => [
-      baseCurrency,
-      quote,
-      rate,
-      fetchedAt,
-    ]);
-
-    if (entries.length > 0) {
-      await pool.query(
-        `INSERT INTO fx_rates (base_currency, quote_currency, rate, fetched_at)
-         VALUES ?`,
-        [entries]
-      );
-    }
-    
-    return { base: baseCurrency, rates };
-    
-  } catch (err) {
-    console.warn('FX API fetch failed, using fallback rates:', err.message);
-    
-    // Use fallback static rates
-    const fallback = FALLBACK_RATES[baseCurrency] || FALLBACK_RATES.USD;
-    const rates = { ...fallback, [baseCurrency]: 1 };
-    
-    // Try to save fallback rates
-    try {
-      const fetchedAt = new Date();
-      const entries = Object.entries(rates).map(([quote, rate]) => [
-        baseCurrency,
-        quote,
-        rate,
-        fetchedAt,
-      ]);
-      
-      if (entries.length > 0) {
-        await pool.query(
-          `INSERT INTO fx_rates (base_currency, quote_currency, rate, fetched_at)
-           VALUES ?`,
-          [entries]
-        );
-      }
-    } catch (saveErr) {
-      console.warn('Could not save fallback rates:', saveErr.message);
-    }
-    
-    return { base: baseCurrency, rates };
-  }
-}
-
-async function getLatestRatesForBase(baseCurrency) {
-  const pool = getPool();
-  const [rows] = await pool.query(
-    `SELECT r.base_currency,
-            r.quote_currency,
-            r.rate,
-            r.fetched_at
-     FROM fx_rates r
-     INNER JOIN (
-       SELECT base_currency, quote_currency, MAX(fetched_at) AS max_time
-       FROM fx_rates
-       WHERE base_currency = ?
-       GROUP BY base_currency, quote_currency
-     ) latest
-       ON r.base_currency = latest.base_currency
-      AND r.quote_currency = latest.quote_currency
-      AND r.fetched_at = latest.max_time
-     ORDER BY r.quote_currency ASC`,
-    [baseCurrency]
-  );
-  return rows;
-}
-
-export async function GET(req) {
+/**
+ * POST /api/wallets/fx
+ * Exchange currency
+ */
+export async function POST(req) {
   try {
     const token = parseBearer(req.headers.get('authorization') || undefined);
     if (!token) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
+
     const user = verifyToken(token);
     if (!user?.id) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
 
-    const { searchParams } = new URL(req.url);
-    const base = searchParams.get('base') || 'USD';
+    const body = await req.json().catch(() => ({}));
+    const { fromCurrency, toCurrency, fromAmount } = body || {};
 
-    // Fetch fresh rates and store them; ignore errors silently in storage
-    await fetchAndStoreLatestRates(base).catch((e) => {
-      console.error('FX fetch warning:', e);
-    });
+    if (!fromCurrency || !toCurrency || !fromAmount) {
+      return NextResponse.json(
+        { message: 'From currency, to currency, and amount are required' },
+        { status: 400 }
+      );
+    }
 
-    const stored = await getLatestRatesForBase(base);
-    
-    // Format response to match frontend expectations
-    const rates = stored.map(r => ({
-      quote_currency: r.quote_currency,
-      rate: Number(r.rate),
-      fetched_at: r.fetched_at,
-    }));
+    const amount = parseFloat(fromAmount);
+    if (amount <= 0) {
+      return NextResponse.json(
+        { message: 'Amount must be greater than 0' },
+        { status: 400 }
+      );
+    }
 
-    return NextResponse.json({
-      baseCurrency: base,
-      rates: rates,
-    });
+    // Calculate exchange
+    const fromRate = exchangeRates[fromCurrency] || 1;
+    const toRate = exchangeRates[toCurrency] || 1;
+    const toAmount = (amount * fromRate) / toRate;
+
+    const pool = getPool();
+
+    // Start transaction
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    try {
+      // Check source wallet balance
+      const [sourceWallet] = await connection.query(
+        `SELECT balance FROM wallets WHERE user_id = ? AND currency = ? FOR UPDATE`,
+        [user.id, fromCurrency]
+      );
+
+      if (!sourceWallet || sourceWallet.length === 0) {
+        throw new Error('Source wallet not found');
+      }
+
+      const currentBalance = parseFloat(sourceWallet[0].balance);
+
+      if (currentBalance < amount) {
+        throw new Error('Insufficient balance');
+      }
+
+      // Deduct from source currency
+      await connection.query(
+        `UPDATE wallets SET balance = balance - ? WHERE user_id = ? AND currency = ?`,
+        [amount, user.id, fromCurrency]
+      );
+
+      // Add to destination currency
+      await connection.query(
+        `INSERT INTO wallets (user_id, currency, balance) 
+         VALUES (?, ?, ?)
+         ON DUPLICATE KEY UPDATE balance = balance + ?`,
+        [user.id, toCurrency, toAmount, toAmount]
+      );
+
+      // Record transaction
+      await connection.query(
+        `INSERT INTO transactions 
+         (user_id, type, from_currency, to_currency, from_amount, to_amount, status) 
+         VALUES (?, 'exchange', ?, ?, ?, ?, 'completed')`,
+        [user.id, fromCurrency, toCurrency, amount, toAmount]
+      );
+
+      // Commit transaction
+      await connection.commit();
+
+      console.log(`✅ [Exchange] ${user.email} exchanged ${amount} ${fromCurrency} to ${toAmount.toFixed(2)} ${toCurrency}`);
+
+      return NextResponse.json({
+        message: 'Exchange successful',
+        exchange: {
+          fromCurrency,
+          toCurrency,
+          fromAmount: amount,
+          toAmount,
+          rate: toAmount / amount,
+        },
+      });
+
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+
   } catch (err) {
-    console.error('Get FX rates error:', err);
+    console.error('❌ [Exchange] Error:', err);
     return NextResponse.json(
-      { message: err?.message || 'Failed to load FX rates' },
+      { message: err?.message || 'Failed to exchange currency' },
       { status: 500 }
     );
   }
 }
-

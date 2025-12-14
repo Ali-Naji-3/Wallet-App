@@ -33,16 +33,32 @@ export default function SendMoneyPage() {
   const selectedCurrency = currencies.find(c => c.code === formData.currency);
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
+  e.preventDefault();
+  setIsLoading(true);
+
+  try {
+    const payload = {
+      recipient: formData.recipient,
+      amount: Number(formData.amount),
+      currency: formData.currency,
+      note: formData.note,
+    };
+
+    await apiClient.post(ENDPOINTS.WALLETS.MY, payload);
+
     toast.success('Money sent successfully!');
-    setIsLoading(false);
+
+    // ✅ روح عالداشبورد أو الترانزاكشن لتشوف التحديث
+    router.push('/wallet'); // أو '/wallet/transactions'
+
     setFormData({ recipient: '', amount: '', currency: 'USD', note: '' });
-  };
+  } catch (err) {
+    console.error(err);
+    toast.error(err?.response?.data?.message || 'Send failed');
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   return (
     <div className="max-w-lg mx-auto space-y-6">

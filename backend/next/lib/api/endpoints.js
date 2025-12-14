@@ -33,15 +33,19 @@ export const ENDPOINTS = {
   },
   
   // Wallets
-  WALLETS: {
-    MY: '/api/wallets/my',
-    CURRENCIES: '/api/wallets/currencies',
-    FX_LATEST: '/api/wallets/fx/latest',
-  },
-  
-  // Transactions
-  TRANSACTIONS: {
-    MY: '/api/transactions/my',
+ // Wallets
+WALLETS: {
+  MY: '/api/wallets/my',
+  BALANCES: '/api/wallets/balances', // ✅ أضفها
+  CURRENCIES: '/api/wallets/currencies',
+  FX_LATEST: '/api/wallets/fx/latest',
+},
+
+// Transactions
+TRANSACTIONS: {
+  MY: '/api/transactions', // ✅ صحّح المسار
+
+
   },
   
   // Dashboard
