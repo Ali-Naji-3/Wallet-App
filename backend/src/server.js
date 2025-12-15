@@ -1,7 +1,7 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
-import { connectDB } from './config/db.js';
+import { connectDB, closeDB } from './config/db.js';
 import authRoutes from './routes/authRoutes.js';
 import walletRoutes from './routes/walletRoutes.js';
 import transactionRoutes from './routes/transactionRoutes.js';
@@ -16,6 +16,7 @@ import { initKYC } from './controllers/kycController.js';
 dotenv.config();
 
 const app = express();
+let server;
 
 // Middleware
 app.use(cors());
@@ -43,22 +44,56 @@ const startServer = async () => {
   await initTransactions();
   await initKYC();
 
-  app.listen(PORT, () => {
+  server = app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
   });
 };
+
+// Graceful shutdown handler
+const gracefulShutdown = async (signal) => {
+  console.log(`\n${signal} received. Starting graceful shutdown...`);
+  
+  // Stop accepting new connections
+  if (server) {
+    server.close(async () => {
+      console.log('✅ HTTP server closed');
+      
+      // Close database connections
+      await closeDB();
+      
+      console.log('✅ Graceful shutdown complete');
+      process.exit(0);
+    });
+    
+    // Force close after 10 seconds
+    setTimeout(() => {
+      console.error('❌ Forcing shutdown after timeout');
+      process.exit(1);
+    }, 10000);
+  } else {
+    // If server wasn't started yet, just close DB
+    await closeDB();
+    process.exit(0);
+  }
+};
+
+// Handle shutdown signals
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 startServer().catch((err) => {
   console.error('Failed to start server:', err);
   process.exit(1);
 });
 
-process.on('uncaughtException', (err) => {
+process.on('uncaughtException', async (err) => {
   console.error('Uncaught Exception:', err);
+  await closeDB();
   process.exit(1);
 });
 
-process.on('unhandledRejection', (err) => {
+process.on('unhandledRejection', async (err) => {
   console.error('Unhandled Rejection:', err);
+  await closeDB();
   process.exit(1);
 });

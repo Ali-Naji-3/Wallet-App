@@ -48,3 +48,15 @@ export const getPool = () => {
   }
   return pool;
 };
+
+// Function to close database connections gracefully
+export const closeDB = async () => {
+  if (pool) {
+    try {
+      await pool.end();
+      console.log('✅ MySQL connections closed gracefully');
+    } catch (error) {
+      console.error('❌ Error closing MySQL connections:', error);
+    }
+  }
+};
