@@ -291,7 +291,7 @@ export default function DashboardPage() {
       <BackgroundAnimation />
 
       {/* Page Header */}
-      <div className="flex items-center justify-between relative z-10">
+      <div className="flex items-center justify-between relative z-20">
         <div>
           <h1 className="text-3xl font-bold text-white mb-2">Dashboard</h1>
           <p className="text-gray-400 text-sm">
@@ -321,13 +321,13 @@ export default function DashboardPage() {
 
       {/* Error State */}
       {error && (
-        <div className="relative z-10 bg-red-500/10 border border-red-500/20 rounded-lg p-4">
+        <div className="relative z-20 bg-red-500/10 border border-red-500/20 rounded-lg p-4">
           <p className="text-red-400 text-sm">{error}</p>
         </div>
       )}
 
       {/* Stats Grid */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 relative z-10">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 relative z-20">
         {statsConfig.map((stat, index) => (
           <div
             key={stat.title}
@@ -349,7 +349,7 @@ export default function DashboardPage() {
 
       {/* Additional Info Cards */}
       {!loading && stats && (
-        <div className="grid gap-6 md:grid-cols-3 relative z-10">
+        <div className="grid gap-6 md:grid-cols-3 relative z-20">
           <Card className="bg-gray-900/80 backdrop-blur-sm border-gray-800/50 rounded-2xl">
             <CardContent className="p-6">
               <div className="flex items-center gap-4">
