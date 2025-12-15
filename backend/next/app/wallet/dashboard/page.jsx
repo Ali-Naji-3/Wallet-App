@@ -102,17 +102,17 @@ function mapTxToRecent(tx) {
     : (tx.note || 'Transfer');
 
   const fromCur = tx.from_currency || '';
-  const fromAmt = safeNumber(tx.from_amount);
+  const fromAmt = parseFloat(tx.from_amount) || 0;
   const toCur = tx.to_currency || '';
-  const toAmt = safeNumber(tx.to_amount);
+  const toAmt = parseFloat(tx.to_amount) || 0;
 
   let amountText = '';
   if (tx.type === 'exchange') {
     // Show both currencies for exchange
-    amountText = `${fromCur} ${isNaN(fromAmt) ? '0.00' : fromAmt.toFixed(2)} → ${toCur} ${isNaN(toAmt) ? '0.00' : toAmt.toFixed(2)}`;
+    amountText = `${fromCur} ${fromAmt.toFixed(2)} → ${toCur} ${toAmt.toFixed(2)}`;
   } else if (tx.type === 'transfer') {
     // Show sent amount with minus sign
-    amountText = `-${WALLET_UI[fromCur]?.symbol || ''}${isNaN(fromAmt) ? '0.00' : fromAmt.toFixed(2)}`;
+    amountText = `-${WALLET_UI[fromCur]?.symbol || ''}${fromAmt.toFixed(2)}`;
   }
 
   return {
@@ -472,12 +472,10 @@ export default function WalletDashboard() {
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-slate-900 dark:text-white">My Cards</h2>
-            <Link href="/wallet/cards">
-              <Button variant="ghost" size="sm" className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300">
-                <Plus className="h-4 w-4 mr-1" />
-                Add Card
-              </Button>
-            </Link>
+            <Button variant="ghost" size="sm" className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300">
+              <Plus className="h-4 w-4 mr-1" />
+              Add Card
+            </Button>
           </div>
 
           <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">

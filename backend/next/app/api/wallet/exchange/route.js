@@ -40,23 +40,27 @@ export async function POST(req) {
       );
     }
 
+    // Normalize currency codes
+    const normalizedSource = sourceCurrency.toUpperCase();
+    const normalizedTarget = targetCurrency.toUpperCase();
+
     const pool = getPool();
     const conn = await pool.getConnection();
 
     try {
       await conn.beginTransaction();
 
-      // Get user wallets
+      // Get user wallets (case-insensitive)
       const [sourceWallets] = await conn.query(
         `SELECT id, currency_code, balance FROM wallets 
-         WHERE user_id = ? AND currency_code = ?`,
-        [user.id, sourceCurrency]
+         WHERE user_id = ? AND UPPER(currency_code) = ?`,
+        [user.id, normalizedSource]
       );
 
       const [targetWallets] = await conn.query(
         `SELECT id, currency_code, balance FROM wallets 
-         WHERE user_id = ? AND currency_code = ?`,
-        [user.id, targetCurrency]
+         WHERE user_id = ? AND UPPER(currency_code) = ?`,
+        [user.id, normalizedTarget]
       );
 
       if (!sourceWallets.length || !targetWallets.length) {
@@ -79,19 +83,57 @@ export async function POST(req) {
         );
       }
 
-      // Get FX rate
-      const latestRates = await getLatestRatesForBase(sourceCurrency);
-      const ratePair = latestRates.find(r => r.quote_currency === targetCurrency);
-      
-      if (!ratePair) {
-        await conn.rollback();
-        return NextResponse.json(
-          { message: 'FX rate not available for this currency pair' },
-          { status: 400 }
-        );
+      // Get FX rate - try database first, fallback to default rates
+      let fxRate;
+      try {
+        const latestRates = await getLatestRatesForBase(normalizedSource);
+        const ratePair = latestRates.find(r => r.quote_currency.toUpperCase() === normalizedTarget);
+        
+        if (ratePair) {
+          fxRate = parseFloat(ratePair.rate);
+        } else {
+          // Fallback to default rates if not in database
+          const defaultRates = {
+            'USD_EUR': 0.92,
+            'USD_LBP': 89500,
+            'EUR_USD': 1.09,
+            'EUR_LBP': 97400,
+            'LBP_USD': 0.0000112,
+            'LBP_EUR': 0.0000103,
+          };
+          const rateKey = `${normalizedSource}_${normalizedTarget}`;
+          fxRate = defaultRates[rateKey];
+          
+          if (!fxRate) {
+            await conn.rollback();
+            return NextResponse.json(
+              { message: 'FX rate not available for this currency pair' },
+              { status: 400 }
+            );
+          }
+        }
+      } catch (rateError) {
+        console.warn('FX rate fetch failed, using defaults:', rateError);
+        // Use default rates as fallback
+        const defaultRates = {
+          'USD_EUR': 0.92,
+          'USD_LBP': 89500,
+          'EUR_USD': 1.09,
+          'EUR_LBP': 97400,
+          'LBP_USD': 0.0000112,
+          'LBP_EUR': 0.0000103,
+        };
+        const rateKey = `${normalizedSource}_${normalizedTarget}`;
+        fxRate = defaultRates[rateKey];
+        
+        if (!fxRate) {
+          await conn.rollback();
+          return NextResponse.json(
+            { message: 'FX rate not available for this currency pair' },
+            { status: 400 }
+          );
+        }
       }
-
-      const fxRate = parseFloat(ratePair.rate);
       const targetAmount = numericAmount * fxRate;
       const feeAmount = 0; // No fee for now
 
@@ -182,4 +224,3 @@ export async function POST(req) {
     );
   }
 }
-

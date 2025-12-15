@@ -59,8 +59,8 @@ export default function ExchangePage() {
           });
           setFxRates(ratesMap);
         } catch (ratesErr) {
-          console.warn('FX rates endpoint not available, using default rates:', ratesErr.message);
-          // Set default rates if API fails
+          console.warn('FX rates endpoint not available, using default rates');
+          // Set comprehensive default rates if API fails
           setFxRates({
             'USD_EUR': 0.92,
             'USD_LBP': 89500,
@@ -68,6 +68,10 @@ export default function ExchangePage() {
             'EUR_LBP': 97400,
             'LBP_USD': 0.000011,
             'LBP_EUR': 0.000010,
+            // Reverse rates
+            'EUR_LBP': 97400,
+            'LBP_EUR': 0.000010,
+            'LBP_USD': 0.000011,
           });
         }
 
