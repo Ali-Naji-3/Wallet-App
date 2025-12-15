@@ -1,9 +1,15 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { apiClient } from '@/lib/api/client';
+import { toast } from 'sonner';
 import { 
   Users, 
   Wallet, 
@@ -12,6 +18,8 @@ import {
   ArrowUpRight,
   RefreshCw,
   TrendingUp,
+  Plus,
+  Coins,
 } from 'lucide-react';
 
 // Format number with commas
@@ -185,6 +193,219 @@ function BackgroundAnimation() {
   );
 }
 
+// Credit User Wallet Modal Component
+function CreditWalletModal() {
+  const [open, setOpen] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [currency, setCurrency] = useState('USD');
+  const [amount, setAmount] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Fetch users when modal opens
+  useEffect(() => {
+    if (open && users.length === 0) {
+      fetchUsers();
+    }
+  }, [open]);
+
+  const fetchUsers = async () => {
+    try {
+      setLoadingUsers(true);
+      const response = await apiClient.get('/api/admin/users?limit=100');
+      setUsers(response.data.users || []);
+    } catch (err) {
+      console.error('Failed to fetch users:', err);
+      toast.error('Failed to load users');
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!selectedUserId || !currency || !amount) {
+      toast.error('Please fill in all fields');
+      return;
+    }
+
+    const numAmount = Number(amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      toast.error('Please enter a valid positive amount');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      const response = await apiClient.post('/api/admin/credit-wallet', {
+        userId: parseInt(selectedUserId),
+        currency,
+        amount: numAmount,
+      });
+
+      const userEmail = selectedUser?.email || 'user';
+      
+      // Enhanced success message
+      toast.success(
+        `Successfully credited ${numAmount} ${currency} to ${userEmail}!`,
+        {
+          description: `User can view their updated balance at: /wallet/dashboard?currency=${currency}`,
+          duration: 8000,
+        }
+      );
+      
+      // Reset form
+      setSelectedUserId('');
+      setCurrency('USD');
+      setAmount('');
+      setOpen(false);
+      
+      // Log for debugging
+      console.log(`[Admin] ✅ Credited ${numAmount} ${currency} to user ID ${selectedUserId} (${userEmail})`);
+      console.log(`[Admin] 🔗 User should visit: /wallet/dashboard?currency=${currency}`);
+    } catch (err) {
+      console.error('Failed to credit wallet:', err);
+      toast.error(err.response?.data?.message || 'Failed to credit wallet');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const selectedUser = users.find(u => u.id === parseInt(selectedUserId));
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button className="bg-emerald-600 hover:bg-emerald-700 text-white">
+          <Plus className="h-4 w-4 mr-2" />
+          Credit User Wallet
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="bg-gray-900 border-gray-800 text-white sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-xl">
+            <Coins className="h-5 w-5 text-emerald-400" />
+            Add Test Balance
+          </DialogTitle>
+          <DialogDescription className="text-gray-400">
+            Credit a user wallet with test money for demo purposes. This is FAKE money for testing only.
+          </DialogDescription>
+        </DialogHeader>
+        
+        <form onSubmit={handleSubmit} className="space-y-6 py-4">
+          {/* User Selection */}
+          <div className="space-y-2">
+            <Label htmlFor="user" className="text-sm font-medium text-gray-300">
+              Select User
+            </Label>
+            <Select value={selectedUserId} onValueChange={setSelectedUserId} disabled={loadingUsers}>
+              <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
+                <SelectValue placeholder={loadingUsers ? "Loading users..." : "Choose a user"} />
+              </SelectTrigger>
+              <SelectContent className="bg-gray-800 border-gray-700">
+                {users.map((user) => (
+                  <SelectItem key={user.id} value={String(user.id)} className="text-white hover:bg-gray-700">
+                    {user.email} {user.full_name ? `(${user.full_name})` : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedUser && (
+              <p className="text-xs text-gray-500">
+                ID: {selectedUser.id} • Status: {selectedUser.is_active ? '✅ Active' : '❌ Inactive'}
+              </p>
+            )}
+          </div>
+
+          {/* Currency Selection */}
+          <div className="space-y-2">
+            <Label htmlFor="currency" className="text-sm font-medium text-gray-300">
+              Currency
+            </Label>
+            <Select value={currency} onValueChange={setCurrency}>
+              <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-gray-800 border-gray-700">
+                <SelectItem value="USD" className="text-white hover:bg-gray-700">
+                  💵 USD - US Dollar
+                </SelectItem>
+                <SelectItem value="EUR" className="text-white hover:bg-gray-700">
+                  💶 EUR - Euro
+                </SelectItem>
+                <SelectItem value="LBP" className="text-white hover:bg-gray-700">
+                  🇱🇧 LBP - Lebanese Pound
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Amount Input */}
+          <div className="space-y-2">
+            <Label htmlFor="amount" className="text-sm font-medium text-gray-300">
+              Amount
+            </Label>
+            <Input
+              id="amount"
+              type="number"
+              step="0.01"
+              min="0.01"
+              placeholder={currency === 'LBP' ? '1000000' : '100.00'}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500"
+              required
+            />
+            <p className="text-xs text-gray-500">
+              This amount will be ADDED to the user existing {currency} balance
+            </p>
+          </div>
+
+          {/* Preview */}
+          {selectedUser && amount && (
+            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-4">
+              <p className="text-sm text-emerald-400 font-medium mb-1">Preview:</p>
+              <p className="text-white">
+                Add <span className="font-bold text-emerald-400">{Number(amount).toLocaleString()} {currency}</span> to <span className="font-bold">{selectedUser.email}</span>
+              </p>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+              className="bg-transparent border-gray-700 text-gray-300 hover:bg-gray-800"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={isSubmitting || !selectedUserId || !amount}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              {isSubmitting ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <Coins className="h-4 w-4 mr-2" />
+                  Credit Wallet
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function DashboardPage() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -286,23 +507,26 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="relative min-h-screen p-6 space-y-6">
-      {/* Background Animation */}
-      <BackgroundAnimation />
+  <div className="relative min-h-screen p-6 space-y-6">
+    {/* Background Animation */}
+    <BackgroundAnimation />
 
-      {/* Page Header */}
-      <div className="flex items-center justify-between relative z-20">
-        <div>
-          <h1 className="text-3xl font-bold text-white mb-2">Dashboard</h1>
-          <p className="text-gray-400 text-sm">
-            Welcome back! Here's what's happening.
-            {lastUpdate && (
-              <span className="ml-2 text-gray-500">
-                Last updated: {lastUpdate.toLocaleTimeString()}
-              </span>
-            )}
-          </p>
-        </div>
+    {/* Page Header */}
+    <div className="flex items-center justify-between relative z-10">
+      <div>
+        <h1 className="text-3xl font-bold text-white mb-2">Dashboard</h1>
+        <p className="text-gray-400 text-sm">
+          Welcome back! Here what happening.
+          {lastUpdate && (
+            <span className="ml-2 text-gray-500">
+              Last updated: {lastUpdate.toLocaleTimeString()}
+            </span>
+          )}
+        </p>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <CreditWalletModal />
         <button
           onClick={() => fetchStats(true)}
           disabled={isRefreshing}
@@ -318,87 +542,94 @@ export default function DashboardPage() {
           <span className="text-sm font-medium">Refresh</span>
         </button>
       </div>
-
-      {/* Error State */}
-      {error && (
-        <div className="relative z-20 bg-red-500/10 border border-red-500/20 rounded-lg p-4">
-          <p className="text-red-400 text-sm">{error}</p>
-        </div>
-      )}
-
-      {/* Stats Grid */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 relative z-20">
-        {statsConfig.map((stat, index) => (
-          <div
-            key={stat.title}
-            style={{ animationDelay: `${index * 100}ms` }}
-            className="opacity-0 animate-[fadeIn_0.5s_ease-out_forwards]"
-          >
-            <StatCard
-              title={stat.title}
-              value={stat.value}
-              icon={stat.icon}
-              color={stat.color}
-              isLoading={loading}
-              trend={stat.trend}
-              change={stat.change}
-            />
-          </div>
-        ))}
-      </div>
-
-      {/* Additional Info Cards */}
-      {!loading && stats && (
-        <div className="grid gap-6 md:grid-cols-3 relative z-20">
-          <Card className="bg-gray-900/80 backdrop-blur-sm border-gray-800/50 rounded-2xl">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-xl bg-blue-500/20 border border-blue-500/20">
-                  <TrendingUp className="h-6 w-6 text-blue-400" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-400 uppercase tracking-wide">24h Transactions</p>
-                  <p className="text-2xl font-bold text-white mt-1">
-                    {formatNumber(stats.totalTransactions)}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gray-900/80 backdrop-blur-sm border-gray-800/50 rounded-2xl">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-xl bg-emerald-500/20 border border-emerald-500/20">
-                  <Users className="h-6 w-6 text-emerald-400" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-400 uppercase tracking-wide">New Users (7d)</p>
-                  <p className="text-2xl font-bold text-white mt-1">
-                    {formatNumber(stats.totalUsers)}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gray-900/80 backdrop-blur-sm border-gray-800/50 rounded-2xl">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-xl bg-purple-500/20 border border-purple-500/20">
-                  <DollarSign className="h-6 w-6 text-purple-400" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-400 uppercase tracking-wide">Total Balance</p>
-                  <p className="text-2xl font-bold text-white mt-1">
-                    {formatCurrency(stats.totalVolume)}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
     </div>
-  );
+
+    {/* Error State */}
+    {error && (
+      <div className="relative z-10 bg-red-500/10 border border-red-500/20 rounded-lg p-4">
+        <p className="text-red-400 text-sm">{error}</p>
+      </div>
+    )}
+
+    {/* Stats Grid */}
+    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 relative z-10">
+      {statsConfig.map((stat, index) => (
+        <div
+          key={stat.title}
+          style={{ animationDelay: `${index * 100}ms` }}
+          className="opacity-0 animate-[fadeIn_0.5s_ease-out_forwards]"
+        >
+          <StatCard
+            title={stat.title}
+            value={stat.value}
+            icon={stat.icon}
+            color={stat.color}
+            isLoading={loading}
+            trend={stat.trend}
+            change={stat.change}
+          />
+        </div>
+      ))}
+    </div>
+
+    {/* Additional Info Cards */}
+    {!loading && stats && (
+      <div className="grid gap-6 md:grid-cols-3 relative z-10">
+        <Card className="bg-gray-900/80 backdrop-blur-sm border-gray-800/50 rounded-2xl">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 rounded-xl bg-blue-500/20 border border-blue-500/20">
+                <TrendingUp className="h-6 w-6 text-blue-400" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-400 uppercase tracking-wide">
+                  24h Transactions
+                </p>
+                <p className="text-2xl font-bold text-white mt-1">
+                  {formatNumber(stats.totalTransactions)}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gray-900/80 backdrop-blur-sm border-gray-800/50 rounded-2xl">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 rounded-xl bg-emerald-500/20 border border-emerald-500/20">
+                <Users className="h-6 w-6 text-emerald-400" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-400 uppercase tracking-wide">
+                  New Users (7d)
+                </p>
+                <p className="text-2xl font-bold text-white mt-1">
+                  {formatNumber(stats.totalUsers)}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gray-900/80 backdrop-blur-sm border-gray-800/50 rounded-2xl">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 rounded-xl bg-purple-500/20 border border-purple-500/20">
+                <DollarSign className="h-6 w-6 text-purple-400" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-400 uppercase tracking-wide">
+                  Total Balance
+                </p>
+                <p className="text-2xl font-bold text-white mt-1">
+                  {formatCurrency(stats.totalVolume)}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )}
+  </div>
+);
 }

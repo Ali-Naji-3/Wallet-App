@@ -297,3 +297,92 @@ export const promoteToAdmin = async (req, res) => {
   }
 };
 
+/**
+ * Credit user wallet with test/fake money (DEMO ONLY)
+ * Admin can add balance to any user's wallet for testing purposes
+ */
+export const creditUserWallet = async (req, res) => {
+  try {
+    const { userId, currency, amount } = req.body;
+
+    // Validation
+    if (!userId || !currency || !amount) {
+      return res.status(400).json({ 
+        message: 'Missing required fields: userId, currency, amount' 
+      });
+    }
+
+    const numericAmount = Number(amount);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      return res.status(400).json({ 
+        message: 'Amount must be a positive number' 
+      });
+    }
+
+    const numericUserId = parseInt(userId);
+    if (!numericUserId) {
+      return res.status(400).json({ message: 'Invalid user ID' });
+    }
+
+    // Check if user exists
+    const user = await findUserById(numericUserId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const pool = getPool();
+
+    // Check if wallet exists for this user and currency
+    const [wallets] = await pool.query(
+      `SELECT id, balance FROM wallets WHERE user_id = ? AND currency_code = ?`,
+      [numericUserId, currency]
+    );
+
+    let newBalance;
+    
+    if (wallets.length === 0) {
+      // Create wallet if it doesn't exist
+      await pool.query(
+        `INSERT INTO wallets (user_id, currency_code, address, balance) 
+         VALUES (?, ?, ?, ?)`,
+        [numericUserId, currency, `FXW-${currency}-${Math.random().toString(36).slice(2, 10).toUpperCase()}`, numericAmount]
+      );
+      newBalance = numericAmount;
+    } else {
+      // Update existing wallet
+      const currentBalance = Number(wallets[0].balance) || 0;
+      newBalance = currentBalance + numericAmount;
+      
+      await pool.query(
+        `UPDATE wallets SET balance = ? WHERE id = ?`,
+        [newBalance, wallets[0].id]
+      );
+    }
+
+    // Create notification for the user
+    await createNotification({
+      userId: numericUserId,
+      type: 'transaction',
+      title: `Test Balance Added`,
+      body: `Admin credited your ${currency} wallet with ${numericAmount.toFixed(2)} ${currency} for testing purposes.`,
+    });
+
+    // Log the admin action
+    console.log(`[ADMIN] User ${req.user.email} credited ${numericAmount} ${currency} to user ${user.email} (ID: ${numericUserId})`);
+
+    return res.json({
+      message: 'Wallet credited successfully',
+      data: {
+        userId: numericUserId,
+        userEmail: user.email,
+        currency,
+        amountAdded: numericAmount,
+        newBalance: newBalance,
+      },
+    });
+  } catch (err) {
+    console.error('Admin credit wallet error:', err);
+    return res.status(500).json({ message: 'Failed to credit wallet' });
+  }
+};
+

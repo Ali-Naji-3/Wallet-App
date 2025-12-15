@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,15 +15,14 @@ import {
 } from '@/components/ui/select';
 import { Send, DollarSign, User, ArrowRight, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-
-const currencies = [
-  { code: 'USD', name: 'US Dollar', symbol: '$', balance: 12450.00 },
-  { code: 'EUR', name: 'Euro', symbol: '€', balance: 8320.50 },
-  { code: 'LBP', name: 'Lebanese Lira', symbol: 'ل.ل', balance: 450000000 },
-];
+import { apiClient } from '@/lib/api/client';
+import { ENDPOINTS } from '@/lib/api/endpoints';
 
 export default function SendMoneyPage() {
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [currencies, setCurrencies] = useState([]);
+  const [loadingBalances, setLoadingBalances] = useState(true);
   const [formData, setFormData] = useState({
     recipient: '',
     amount: '',
@@ -30,18 +30,70 @@ export default function SendMoneyPage() {
     note: '',
   });
 
+  // Fetch real balances on mount
+  useEffect(() => {
+    const fetchBalances = async () => {
+      try {
+        const response = await apiClient.get(ENDPOINTS.WALLETS.BALANCES);
+        const balances = response.data?.balances || [];
+        
+        const currencyData = balances.map(b => ({
+          code: b.currency,
+          name: b.currency === 'USD' ? 'US Dollar' : b.currency === 'EUR' ? 'Euro' : 'Lebanese Lira',
+          symbol: b.currency === 'USD' ? '$' : b.currency === 'EUR' ? '€' : 'ل.ل',
+          balance: parseFloat(b.balance) || 0,
+        }));
+        
+        setCurrencies(currencyData);
+        setLoadingBalances(false);
+      } catch (err) {
+        console.error('Failed to fetch balances:', err);
+        toast.error('Failed to load wallet balances');
+        setLoadingBalances(false);
+      }
+    };
+    
+    fetchBalances();
+  }, []);
+
   const selectedCurrency = currencies.find(c => c.code === formData.currency);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    toast.success('Money sent successfully!');
-    setIsLoading(false);
-    setFormData({ recipient: '', amount: '', currency: 'USD', note: '' });
+
+    try {
+      const payload = {
+        recipientEmail: formData.recipient.trim(),
+        amount: parseFloat(formData.amount),
+        currency: formData.currency,
+        note: formData.note.trim() || undefined,
+      };
+
+      const response = await apiClient.post(ENDPOINTS.WALLETS.TRANSFER, payload);
+
+      toast.success('Money sent successfully!', {
+        description: `Sent ${payload.amount} ${payload.currency} to ${payload.recipientEmail}`,
+        duration: 5000,
+      });
+
+      // Reset form
+      setFormData({ recipient: '', amount: '', currency: 'USD', note: '' });
+      
+      // Redirect to dashboard to see updated balance
+      setTimeout(() => {
+        router.push(`/wallet/dashboard?currency=${formData.currency}`);
+      }, 1500);
+    } catch (err) {
+      console.error('Send failed:', err);
+      const errorMessage = err?.response?.data?.message || 'Failed to send money';
+      toast.error('Transfer Failed', {
+        description: errorMessage,
+        duration: 7000,
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

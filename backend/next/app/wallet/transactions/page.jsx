@@ -164,8 +164,8 @@ export default function TransactionsPage() {
     // Date filter
     const matchesDate = applyDateFilter(tx.created_at);
     
-    // Amount filter
-    const txAmount = Math.abs(tx.amount || 0);
+    // Amount filter - handle different transaction formats
+    const txAmount = Math.abs(parseFloat(tx.from_amount || tx.amount || 0) || 0);
     const matchesMinAmount = minAmount === '' || txAmount >= parseFloat(minAmount);
     const matchesMaxAmount = maxAmount === '' || txAmount <= parseFloat(maxAmount);
     
@@ -185,10 +185,10 @@ export default function TransactionsPage() {
     const headers = ['Date', 'Type', 'Description', 'Amount', 'Currency', 'Status', 'Category'];
     const csvData = filteredTransactions.map(tx => [
       new Date(tx.created_at).toLocaleString(),
-      tx.transaction_type,
-      tx.description || '',
-      tx.amount,
-      tx.currency,
+      tx.transaction_type || tx.type,
+      tx.description || tx.note || '',
+      parseFloat(tx.from_amount || tx.amount || 0) || 0,
+      tx.from_currency || tx.currency || '',
       tx.status,
       tx.category || 'other'
     ]);
@@ -234,8 +234,8 @@ export default function TransactionsPage() {
     total: filteredTransactions.length,
     completed: filteredTransactions.filter(tx => tx.status === 'completed').length,
     pending: filteredTransactions.filter(tx => tx.status === 'pending').length,
-    totalIncome: filteredTransactions.filter(tx => tx.transaction_type === 'receive').reduce((sum, tx) => sum + (tx.amount || 0), 0),
-    totalExpense: filteredTransactions.filter(tx => tx.transaction_type === 'send').reduce((sum, tx) => sum + (tx.amount || 0), 0),
+    totalIncome: filteredTransactions.filter(tx => tx.transaction_type === 'receive').reduce((sum, tx) => sum + (parseFloat(tx.amount || 0) || 0), 0),
+    totalExpense: filteredTransactions.filter(tx => tx.transaction_type === 'send').reduce((sum, tx) => sum + (parseFloat(tx.from_amount || tx.amount || 0) || 0), 0),
   };
 
   const getTypeIcon = (type) => {
@@ -270,9 +270,27 @@ export default function TransactionsPage() {
     return cat.icon;
   };
 
-  const formatAmount = (amount, currency, type) => {
-    const sign = type === 'send' ? '-' : type === 'receive' ? '+' : '';
-    return `${sign}${currency || '$'}${Math.abs(amount).toFixed(2)}`;
+  const formatAmount = (tx) => {
+    // Handle different transaction types and API response formats
+    if (tx.type === 'exchange' || tx.transaction_type === 'exchange') {
+      const fromAmt = parseFloat(tx.from_amount || tx.amount || 0) || 0;
+      const toAmt = parseFloat(tx.to_amount || 0) || 0;
+      const fromCur = tx.from_currency || tx.currency || '';
+      const toCur = tx.to_currency || '';
+      return `${fromCur} ${fromAmt.toFixed(2)} → ${toCur} ${toAmt.toFixed(2)}`;
+    } else if (tx.type === 'transfer' || tx.transaction_type === 'send') {
+      const amt = parseFloat(tx.from_amount || tx.amount || 0) || 0;
+      const cur = tx.from_currency || tx.currency || '$';
+      return `-${cur}${amt.toFixed(2)}`;
+    } else if (tx.transaction_type === 'receive') {
+      const amt = parseFloat(tx.amount || 0) || 0;
+      const cur = tx.currency || '$';
+      return `+${cur}${amt.toFixed(2)}`;
+    } else {
+      const amt = parseFloat(tx.amount || 0) || 0;
+      const cur = tx.currency || '$';
+      return `${cur}${amt.toFixed(2)}`;
+    }
   };
 
   const formatDate = (dateString) => {
@@ -568,7 +586,7 @@ export default function TransactionsPage() {
                             tx.transaction_type === 'send' ? 'text-red-600 dark:text-red-400' :
                             'text-amber-600 dark:text-amber-400'
                   }`}>
-                            {formatAmount(tx.amount, tx.currency, tx.transaction_type)}
+                            {formatAmount(tx)}
                           </p>
                         </div>
                     <Badge

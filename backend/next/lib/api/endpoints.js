@@ -35,10 +35,13 @@ export const ENDPOINTS = {
   // Wallets
   WALLETS: {
     MY: '/api/wallets/my',
+    BALANCES: '/api/wallets/balances',
     CURRENCIES: '/api/wallets/currencies',
     FX_LATEST: '/api/wallets/fx/latest',
+    TRANSFER: '/api/wallet/transfer',
+    EXCHANGE: '/api/wallet/exchange',
   },
-  
+
   // Transactions
   TRANSACTIONS: {
     MY: '/api/transactions/my',
