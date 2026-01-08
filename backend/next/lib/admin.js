@@ -27,12 +27,11 @@ export async function requireAdmin(token) {
     }
     
     const userRole = rows[0]?.role;
+    const normalizedRole = String(userRole || '').trim().toLowerCase();
     
-    // Temporarily allowing any authenticated user for debugging
-    // TODO: Re-enable admin check after fixing auth
-    // if (userRole !== 'admin') {
-    //   throw new Error('Forbidden: Admin access required');
-    // }
+    if (normalizedRole !== 'admin') {
+      throw new Error('Forbidden: Admin access required');
+    }
     
     return user;
   } catch (error) {

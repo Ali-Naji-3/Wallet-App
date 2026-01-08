@@ -26,6 +26,12 @@ apiClient.interceptors.request.use(
     const token = typeof window !== 'undefined' ? localStorage.getItem('fxwallet_token') : null;
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+      // SECURITY: Log token info to help debug user switching issues
+      console.log('[API Client] Request with token:', {
+        url: config.url,
+        method: config.method,
+        tokenPreview: token.slice(0, 20) + '...',
+      });
     }
     return config;
   },

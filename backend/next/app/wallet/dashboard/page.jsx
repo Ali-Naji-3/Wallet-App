@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -25,45 +25,76 @@ import {
   Home,
 } from 'lucide-react';
 import TransactionAnalytics from '@/components/TransactionAnalytics';
+import apiClient from '@/lib/api/client';
+import { toast } from 'sonner';
 
-const walletBalances = [
-  { 
-    currency: 'USD', 
-    symbol: '$', 
-    balance: 12450.00, 
-    change: '+2.5%', 
-    trend: 'up', 
+// Static configuration for currency display properties
+const currencyConfig = {
+  USD: {
+    symbol: '$',
     icon: DollarSign,
     cardType: 'PLATINUM',
     cardNumber: '4532',
     cardColor: 'from-slate-700 via-slate-600 to-slate-800',
     textColor: 'text-white',
   },
-  { 
-    currency: 'EUR', 
-    symbol: '€', 
-    balance: 8320.50, 
-    change: '+1.8%', 
-    trend: 'up', 
+  EUR: {
+    symbol: '€',
     icon: Euro,
     cardType: 'GOLD',
     cardNumber: '6852',
     cardColor: 'from-amber-600 via-amber-500 to-yellow-600',
     textColor: 'text-white',
   },
-  { 
-    currency: 'LBP', 
-    symbol: 'ل.ل', 
-    balance: 450000000, 
-    change: '+0.1%', 
-    trend: 'up', 
+  LBP: {
+    symbol: 'ل.ل',
     icon: DollarSign,
     cardType: 'BLACK',
     cardNumber: '3117',
     cardColor: 'from-gray-900 via-gray-800 to-black',
     textColor: 'text-white',
   },
-];
+  GBP: {
+    symbol: '£',
+    icon: DollarSign,
+    cardType: 'SILVER',
+    cardNumber: '2948',
+    cardColor: 'from-slate-500 via-slate-400 to-slate-600',
+    textColor: 'text-white',
+  },
+  JPY: {
+    symbol: '¥',
+    icon: DollarSign,
+    cardType: 'BLUE',
+    cardNumber: '7531',
+    cardColor: 'from-blue-600 via-blue-500 to-blue-700',
+    textColor: 'text-white',
+  },
+  CHF: {
+    symbol: 'CHF',
+    icon: DollarSign,
+    cardType: 'RED',
+    cardNumber: '8642',
+    cardColor: 'from-red-600 via-red-500 to-red-700',
+    textColor: 'text-white',
+  },
+  CAD: {
+    symbol: '$',
+    icon: DollarSign,
+    cardType: 'MAPLE',
+    cardNumber: '9753',
+    cardColor: 'from-rose-600 via-rose-500 to-rose-700',
+    textColor: 'text-white',
+  },
+  AUD: {
+    symbol: '$',
+    icon: DollarSign,
+    cardType: 'EMERALD',
+    cardNumber: '1864',
+    cardColor: 'from-teal-600 via-teal-500 to-teal-700',
+    textColor: 'text-white',
+  },
+};
 
 const recentTransactions = [
   { id: 1, type: 'received', name: 'John Smith', amount: '+$500.00', time: '2 hours ago', status: 'completed' },
@@ -95,31 +126,116 @@ export default function WalletDashboard() {
   const [heroCardIndex, setHeroCardIndex] = useState(0); // Index of card in hero position
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
+  const [walletBalances, setWalletBalances] = useState([]);
+  const [isLoadingBalances, setIsLoadingBalances] = useState(true);
   
+  // Fetch real wallet balances from backend
+  const fetchWalletBalances = async () => {
+    try {
+      const response = await apiClient.get('/api/wallets/my');
+      const wallets = response.data || [];
+      
+      // Default visible currencies (user can add more later via "Add Card")
+      const defaultCurrencies = ['USD', 'EUR', 'LBP'];
+      
+      // Merge API balances with static display properties
+      const mergedBalances = wallets
+        .filter(wallet => 
+          currencyConfig[wallet.currency_code] && 
+          defaultCurrencies.includes(wallet.currency_code) // Only show USD, EUR, LBP by default
+        )
+        .map(wallet => ({
+          currency: wallet.currency_code,
+          balance: parseFloat(wallet.balance) || 0,
+          change: '+2.5%', // Static for now (can be calculated later)
+          trend: 'up', // Static for now (can be calculated later)
+          ...currencyConfig[wallet.currency_code],
+        }));
+      
+      // If API returns wallets, use them; otherwise, show default currencies with zero balance
+      if (mergedBalances.length > 0) {
+        setWalletBalances(mergedBalances);
+      } else {
+        // Fallback: Show only USD, EUR, LBP with zero balance
+        const defaultWallets = ['USD', 'EUR', 'LBP'].map(code => ({
+          currency: code,
+          balance: 0,
+          change: '+0.0%',
+          trend: 'up',
+          ...currencyConfig[code],
+        }));
+        setWalletBalances(defaultWallets);
+      }
+    } catch (error) {
+      console.error('Failed to fetch wallet balances:', error);
+      // On error, show only USD, EUR, LBP with zero balance so UI doesn't break
+      const defaultWallets = ['USD', 'EUR', 'LBP'].map(code => ({
+        currency: code,
+        balance: 0,
+        change: '+0.0%',
+        trend: 'up',
+        ...currencyConfig[code],
+      }));
+      setWalletBalances(defaultWallets);
+    } finally {
+      setIsLoadingBalances(false);
+    }
+  };
+
+  // Fetch balances on component mount
+  useEffect(() => {
+    fetchWalletBalances();
+  }, []);
+
+  // Show loading state only during initial load
+  if (isLoadingBalances) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <RefreshCw className="h-8 w-8 animate-spin text-emerald-600 dark:text-emerald-400 mx-auto mb-4" />
+          <p className="text-slate-600 dark:text-slate-400">Loading your wallets...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Ensure we always have at least one wallet to display
+  const displayWallets = walletBalances.length > 0 ? walletBalances : [
+    {
+      currency: 'USD',
+      balance: 0,
+      change: '+0.0%',
+      trend: 'up',
+      ...currencyConfig['USD'],
+    }
+  ];
+
+  // Safety: if wallet count changes, keep hero index in range (no UI change, just prevents crashes)
+  const safeHeroCardIndex = Math.min(heroCardIndex, displayWallets.length - 1);
+
   // Calculate total balance in USD
-  const totalBalance = walletBalances.reduce((sum, w) => {
+  const totalBalance = displayWallets.reduce((sum, w) => {
     const rate = exchangeRates[w.currency] || 1;
     return sum + (w.balance * rate);
   }, 0);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await fetchWalletBalances();
     setIsRefreshing(false);
   };
 
   // Handle card click - swap with hero card
   const handleCardClick = (clickedIndex) => {
-    if (clickedIndex !== heroCardIndex) {
+    if (clickedIndex !== safeHeroCardIndex) {
       setHeroCardIndex(clickedIndex);
     }
   };
 
-  const heroCard = walletBalances[heroCardIndex];
+  const heroCard = displayWallets[safeHeroCardIndex];
   
   // Get all cards except the one in hero position
-  const carouselCards = walletBalances.filter((_, index) => index !== heroCardIndex);
+  const carouselCards = displayWallets.filter((_, index) => index !== safeHeroCardIndex);
 
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -372,7 +488,16 @@ export default function WalletDashboard() {
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white">My Cards</h2>
-          <Button variant="ghost" size="sm" className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300"
+            onClick={() => {
+              toast.info('Add Card feature coming soon!', {
+                description: 'You will be able to add GBP, JPY, CHF, CAD, AUD and more.',
+              });
+            }}
+          >
             <Plus className="h-4 w-4 mr-1" />
             Add Card
           </Button>
@@ -381,8 +506,8 @@ export default function WalletDashboard() {
         <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
           {carouselCards.map((wallet, carouselIndex) => {
             const Icon = wallet.icon;
-            // Find the original index in walletBalances array
-            const originalIndex = walletBalances.findIndex(w => w.currency === wallet.currency);
+            // Find the original index in displayWallets array
+            const originalIndex = displayWallets.findIndex(w => w.currency === wallet.currency);
             
             return (
               <button

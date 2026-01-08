@@ -53,7 +53,29 @@ export async function POST(req) {
 
     const userId = result.insertId;
 
-    // 4. Create JWT Token
+    // 4. Create default wallets for the new user
+    try {
+      const currencies = ['USD', 'EUR', 'GBP', 'LBP', 'JPY', 'CHF', 'CAD', 'AUD'];
+      const buildWalletAddress = (currencyCode) => {
+        const random = Math.random().toString(36).slice(2, 10).toUpperCase();
+        return `FXW-${currencyCode}-${random}`;
+      };
+
+      for (const currency of currencies) {
+        const address = buildWalletAddress(currency);
+        await pool.query(
+          `INSERT INTO wallets (user_id, currency_code, address, balance, status)
+           VALUES (?, ?, ?, 0, 'active')`,
+          [userId, currency, address]
+        );
+      }
+      console.log(`✅ Created ${currencies.length} wallets for user ${userId}`);
+    } catch (walletError) {
+      console.error('Warning: Failed to create wallets:', walletError);
+      // Don't fail registration if wallet creation fails
+    }
+
+    // 5. Create JWT Token
     const secret = process.env.JWT_SECRET;
     if (!secret) {
       throw new Error('JWT_SECRET not configured');
@@ -69,7 +91,7 @@ export async function POST(req) {
       { expiresIn: '1d' } // Token expires in 1 day
     );
 
-    // 5. Return token and user info
+    // 6. Return token and user info
     return NextResponse.json({
       token,
       user: {

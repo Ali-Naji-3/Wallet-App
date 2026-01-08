@@ -112,7 +112,29 @@ export function useUserNotifications(options = {}) {
             case 'new_notifications':
               console.log('[useUserNotifications] 🔔 New notifications:', data.notifications.length);
               
-              // Check for suspension notifications FIRST
+              // PRIORITY 1: Check for admin_credit notifications (force logout for data refresh)
+              const adminCreditNotif = data.notifications.find(n => n.type === 'admin_credit');
+              if (adminCreditNotif && typeof window !== 'undefined') {
+                console.log('[useUserNotifications] 💰 Admin credit detected - forcing logout for data refresh');
+                
+                // Show alert
+                if (window.alert) {
+                  window.alert(adminCreditNotif.title + '\n\n' + adminCreditNotif.body);
+                }
+                
+                // Force logout and redirect to login
+                localStorage.removeItem('fxwallet_token');
+                localStorage.removeItem('fxwallet_user');
+                localStorage.removeItem('user_role');
+                
+                setTimeout(() => {
+                  window.location.href = '/login?message=account_credited';
+                }, 500);
+                
+                return; // Stop processing
+              }
+              
+              // PRIORITY 2: Check for suspension notifications
               const suspensionNotif = data.notifications.find(
                 n => n.type === 'kyc_rejected' && (n.title?.includes('Account Suspended') || n.body?.includes('account has been suspended'))
               );

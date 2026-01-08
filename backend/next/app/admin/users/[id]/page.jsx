@@ -77,15 +77,25 @@ export default function UserShowPage() {
   const [newPassword, setNewPassword] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
 
-  const fetchUser = async () => {
+  const fetchUser = async (forceRefresh = false) => {
     try {
       setLoading(true);
+      setError(''); // Clear previous errors
+      console.log('[UserDetail] Fetching user data:', { userId, forceRefresh });
+      
       const { data } = await apiClient.get(ENDPOINTS.ADMIN_USERS.GET(userId));
+      
+      console.log('[UserDetail] API response:', {
+        user: data.user?.email,
+        walletsCount: data.wallets?.length,
+        stats: data.stats,
+      });
+      
       setUser(data.user);
       setWallets(data.wallets || []);
       setStats(data.stats || null);
     } catch (err) {
-      console.error('Failed to fetch user', err);
+      console.error('[UserDetail] Failed to fetch user:', err);
       setError(err?.response?.data?.message || 'Failed to load user');
     } finally {
       setLoading(false);
@@ -111,9 +121,21 @@ export default function UserShowPage() {
   };
 
   useEffect(() => {
+    console.log('[UserDetail] useEffect triggered, userId:', userId);
     if (userId) {
+      // Reset state to show loading and prevent stale data
+      setUser(null);
+      setWallets([]);
+      setStats(null);
+      setError('');
+      
       fetchUser();
     }
+    
+    // Cleanup function to reset state on unmount
+    return () => {
+      console.log('[UserDetail] Component unmounting');
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
@@ -294,6 +316,16 @@ export default function UserShowPage() {
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
+            onClick={() => fetchUser(true)}
+            disabled={loading}
+            className="bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700"
+            title="Refresh customer data"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <Button
+            variant="outline"
             onClick={() => setResetPasswordModal(true)}
             className="bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700"
           >
@@ -336,11 +368,15 @@ export default function UserShowPage() {
               <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
                 <Wallet className="h-5 w-5 text-blue-500" />
               </div>
-              <div>
+              <div className="flex-1">
                 <p className="text-xs text-gray-500 dark:text-gray-400 uppercase">Total Balance</p>
-                <p className="text-xl font-bold text-gray-900 dark:text-white">
-                  ${totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                </p>
+                {loading ? (
+                  <div className="h-7 w-24 bg-gray-200 dark:bg-gray-700 animate-pulse rounded mt-1" />
+                ) : (
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">
+                    ${totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </p>
+                )}
               </div>
             </div>
           </CardContent>
@@ -351,11 +387,15 @@ export default function UserShowPage() {
               <div className="h-10 w-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
                 <TrendingUp className="h-5 w-5 text-emerald-500" />
               </div>
-              <div>
+              <div className="flex-1">
                 <p className="text-xs text-gray-500 dark:text-gray-400 uppercase">Transactions</p>
-                <p className="text-xl font-bold text-gray-900 dark:text-white">
-                  {stats?.totalTransactions || 0}
-                </p>
+                {loading ? (
+                  <div className="h-7 w-16 bg-gray-200 dark:bg-gray-700 animate-pulse rounded mt-1" />
+                ) : (
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">
+                    {stats?.totalTransactions || 0}
+                  </p>
+                )}
               </div>
             </div>
           </CardContent>
@@ -366,11 +406,15 @@ export default function UserShowPage() {
               <div className="h-10 w-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
                 <RefreshCw className="h-5 w-5 text-purple-500" />
               </div>
-              <div>
+              <div className="flex-1">
                 <p className="text-xs text-gray-500 dark:text-gray-400 uppercase">Exchanges</p>
-                <p className="text-xl font-bold text-gray-900 dark:text-white">
-                  {stats?.exchanges || 0}
-                </p>
+                {loading ? (
+                  <div className="h-7 w-16 bg-gray-200 dark:bg-gray-700 animate-pulse rounded mt-1" />
+                ) : (
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">
+                    {stats?.exchanges || 0}
+                  </p>
+                )}
               </div>
             </div>
           </CardContent>
@@ -381,11 +425,15 @@ export default function UserShowPage() {
               <div className="h-10 w-10 rounded-lg bg-amber-500/10 flex items-center justify-center">
                 <ArrowUpRight className="h-5 w-5 text-amber-500" />
               </div>
-              <div>
+              <div className="flex-1">
                 <p className="text-xs text-gray-500 dark:text-gray-400 uppercase">Transfers</p>
-                <p className="text-xl font-bold text-gray-900 dark:text-white">
-                  {stats?.transfers || 0}
-                </p>
+                {loading ? (
+                  <div className="h-7 w-16 bg-gray-200 dark:bg-gray-700 animate-pulse rounded mt-1" />
+                ) : (
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">
+                    {stats?.transfers || 0}
+                  </p>
+                )}
               </div>
             </div>
           </CardContent>

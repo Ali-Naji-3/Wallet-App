@@ -18,7 +18,7 @@ export async function GET(req) {
         w.address,
         w.created_at,
         u.email AS user_email,
-        u.name AS user_name
+          u.full_name AS user_name
       FROM wallets w
       JOIN users u ON w.user_id = u.id
       ORDER BY w.created_at DESC
@@ -34,6 +34,7 @@ export async function GET(req) {
     );
   }
 }
+
 
 
 

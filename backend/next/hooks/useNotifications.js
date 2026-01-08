@@ -10,6 +10,7 @@ import apiClient from '@/lib/api/client';
 export function useNotifications(options = {}) {
   const { 
     enabled = true,
+    scope = 'auto', // 'auto' | 'admin' | 'user'
     onNewNotification,
     onError,
   } = options;
@@ -26,15 +27,46 @@ export function useNotifications(options = {}) {
   const maxReconnectAttempts = 5;
   const isConnectingRef = useRef(false);
   const mountedRef = useRef(false);
+
+  // Determine which API namespace to use.
+  // - admin: /api/admin/notifications + /api/admin/notifications/stream
+  // - user:  /api/notifications/my     + /api/notifications/stream
+  const resolveScope = useCallback(() => {
+    if (scope === 'admin' || scope === 'user') return scope;
+    if (typeof window === 'undefined') return 'user';
+    return window.location.pathname.startsWith('/admin') ? 'admin' : 'user';
+  }, [scope]);
+
+  const getEndpoints = useCallback(() => {
+    const resolved = resolveScope();
+    if (resolved === 'admin') {
+      return {
+        list: '/api/admin/notifications',
+        stream: '/api/admin/notifications/stream',
+        mutate: '/api/admin/notifications',
+      };
+    }
+    return {
+      list: '/api/notifications/my',
+      stream: '/api/notifications/stream',
+      mutate: '/api/notifications/my',
+    };
+  }, [resolveScope]);
   
   // Fetch initial notifications
   const fetchInitialNotifications = useCallback(async () => {
     try {
-      const { data } = await apiClient.get('/api/admin/notifications', {
+      const endpoints = getEndpoints();
+      const { data } = await apiClient.get(endpoints.list, {
         timeout: 5000, // 5 second timeout
       });
-      setNotifications(data.notifications || []);
-      setUnreadCount(data.unreadCount || 0);
+      const list = data?.notifications || [];
+      // User endpoint doesn't return unreadCount; compute it locally.
+      const computedUnread = typeof data?.unreadCount === 'number'
+        ? data.unreadCount
+        : list.reduce((acc, n) => acc + (n?.is_read ? 0 : 1), 0);
+      setNotifications(list);
+      setUnreadCount(computedUnread);
       setLoading(false);
     } catch (err) {
       // Ignore timeout/abort errors - SSE will provide data
@@ -47,7 +79,7 @@ export function useNotifications(options = {}) {
       setLoading(false);
       if (onError) onError(err);
     }
-  }, [onError]);
+  }, [onError, getEndpoints]);
   
   // Connect to SSE stream
   const connect = useCallback(() => {
@@ -76,7 +108,8 @@ export function useNotifications(options = {}) {
     
     try {
       // Create EventSource with token in query param (SSE doesn't support custom headers easily)
-      const url = new URL('/api/admin/notifications/stream', window.location.origin);
+      const endpoints = getEndpoints();
+      const url = new URL(endpoints.stream, window.location.origin);
       url.searchParams.set('token', token);
       
       const eventSource = new EventSource(url.toString());
@@ -118,6 +151,32 @@ export function useNotifications(options = {}) {
               });
               
               setUnreadCount(data.unreadCount || 0);
+              
+              // IMPORTANT: Check for admin_credit notifications
+              // These require immediate logout to refresh wallet data
+              const hasAdminCredit = data.notifications.some(n => n.type === 'admin_credit');
+              if (hasAdminCredit && resolveScope() === 'user') {
+                console.log('[useNotifications] Admin credit detected - forcing logout for data refresh');
+                
+                // Show notification before logout
+                const creditNotif = data.notifications.find(n => n.type === 'admin_credit');
+                if (creditNotif && typeof window !== 'undefined') {
+                  // Use toast/alert to show message
+                  if (window.alert) {
+                    window.alert(creditNotif.title + '\n\n' + creditNotif.body);
+                  }
+                  
+                  // Force logout and redirect to login
+                  localStorage.removeItem('fxwallet_token');
+                  localStorage.removeItem('fxwallet_user');
+                  localStorage.removeItem('user_role');
+                  
+                  setTimeout(() => {
+                    window.location.href = '/login?message=account_credited';
+                  }, 500);
+                }
+                return; // Don't process other callbacks
+              }
               
               // Call callback if provided
               if (onNewNotification && data.notifications.length > 0) {
@@ -182,7 +241,7 @@ export function useNotifications(options = {}) {
         isConnectingRef.current = false;
         if (onError) onError(err);
       }
-    }, [enabled, onNewNotification, onError]);
+    }, [enabled, onNewNotification, onError, getEndpoints]);
   
   // Disconnect from SSE stream
   const disconnect = useCallback(() => {
@@ -201,7 +260,8 @@ export function useNotifications(options = {}) {
   // Mark notification as read
   const markAsRead = useCallback(async (notificationId) => {
     try {
-      await apiClient.post('/api/admin/notifications', { notificationId });
+      const endpoints = getEndpoints();
+      await apiClient.post(endpoints.mutate, { notificationId });
       setNotifications(prev =>
         prev.map(n => n.id === notificationId ? { ...n, is_read: 1 } : n)
       );
@@ -210,43 +270,46 @@ export function useNotifications(options = {}) {
       console.error('[useNotifications] Error marking as read:', err);
       throw err;
     }
-  }, []);
+  }, [getEndpoints]);
   
   // Mark all as read
   const markAllAsRead = useCallback(async () => {
     try {
-      await apiClient.post('/api/admin/notifications', { markAllRead: true });
+      const endpoints = getEndpoints();
+      await apiClient.post(endpoints.mutate, { markAllRead: true });
       setNotifications(prev => prev.map(n => ({ ...n, is_read: 1 })));
       setUnreadCount(0);
     } catch (err) {
       console.error('[useNotifications] Error marking all as read:', err);
       throw err;
     }
-  }, []);
+  }, [getEndpoints]);
 
   // Delete single notification
   const deleteNotification = useCallback(async (notificationId) => {
     try {
-      await apiClient.delete(`/api/admin/notifications?id=${notificationId}`);
+      const endpoints = getEndpoints();
+      await apiClient.delete(`${endpoints.mutate}?id=${notificationId}`);
       setNotifications(prev => prev.filter(n => n.id !== notificationId));
       setUnreadCount(prev => Math.max(0, prev - 1));
     } catch (err) {
       console.error('[useNotifications] Error deleting notification:', err);
       throw err;
     }
-  }, []);
+  }, [getEndpoints]);
 
   // Clear all notifications
   const clearAll = useCallback(async () => {
     try {
-      await apiClient.delete('/api/admin/notifications?clearAll=true');
+      const endpoints = getEndpoints();
+      await apiClient.delete(`${endpoints.mutate}?clearAll=true`);
       setNotifications([]);
       setUnreadCount(0);
     } catch (err) {
       console.error('[useNotifications] Error clearing all notifications:', err);
       throw err;
     }
-  }, []);
+  }, [getEndpoints]);
   
   // Refresh notifications manually
   const refresh = useCallback(async () => {

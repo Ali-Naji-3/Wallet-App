@@ -22,7 +22,9 @@ export async function POST(req) {
       [user.id]
     );
 
-    if (!userRows.length || userRows[0].role !== 'admin') {
+    const role = userRows?.[0]?.role;
+    const normalizedRole = String(role || '').trim().toLowerCase();
+    if (!userRows.length || normalizedRole !== 'admin') {
       return NextResponse.json({ message: 'Forbidden: Admin access required' }, { status: 403 });
     }
 
@@ -109,14 +111,15 @@ export async function POST(req) {
         ]
       );
 
-      // Create notification for user
+      // Create notification for user with special type 'admin_credit'
+      // This will trigger customer logout to see fresh balance
       await conn.query(
         `INSERT INTO notifications (user_id, type, title, body, is_read, created_at)
-         VALUES (?, 'transaction', ?, ?, 0, NOW())`,
+         VALUES (?, 'admin_credit', ?, ?, 0, NOW())`,
         [
           targetWallet.user_id,
           `Account Credited: ${numericAmount} ${targetWallet.currency_code}`,
-          `Your ${targetWallet.currency_code} wallet has been credited with ${numericAmount} ${targetWallet.currency_code} by an administrator.`,
+          `Your ${targetWallet.currency_code} wallet has been credited with ${numericAmount} ${targetWallet.currency_code} by an administrator. Please login again to see your updated balance.`,
         ]
       );
 
@@ -144,6 +147,8 @@ export async function POST(req) {
     conn.release();
   }
 }
+
+
 
 
 

@@ -1,31 +1,134 @@
 'use client';
 
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Wallet, Plus, Search, Filter, Eye, Pencil, DollarSign, Euro } from 'lucide-react';
-import Link from 'next/link';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Wallet, Search, Filter, Eye, RefreshCw, DollarSign, Euro, Coins } from 'lucide-react';
+import { toast } from 'sonner';
+import apiClient from '@/lib/api/client';
+import CreditFundsPanel from '@/components/admin/CreditFundsPanel';
 
-const wallets = [
-  { id: 1, user: 'John Doe', email: 'john@example.com', currency: 'USD', balance: 12450.00, status: 'active', icon: DollarSign },
-  { id: 2, user: 'Jane Smith', email: 'jane@example.com', currency: 'EUR', balance: 8320.50, status: 'active', icon: Euro },
-  { id: 3, user: 'Mike Johnson', email: 'mike@example.com', currency: 'LBP', balance: 450000000, status: 'frozen', icon: DollarSign },
-  { id: 4, user: 'Sarah Wilson', email: 'sarah@example.com', currency: 'USD', balance: 23100.00, status: 'active', icon: DollarSign },
-  { id: 5, user: 'Tom Brown', email: 'tom@example.com', currency: 'LBP', balance: 150000000, status: 'active', icon: DollarSign },
-];
+const getCurrencyIcon = (currency) => {
+  switch (currency) {
+    case 'EUR':
+      return Euro;
+    case 'USD':
+    case 'GBP':
+    case 'LBP':
+    default:
+      return DollarSign;
+  }
+};
+
+const formatBalance = (amount, currency) => {
+  const num = parseFloat(amount);
+  if (isNaN(num)) return '0.00';
+  
+  switch (currency) {
+    case 'LBP':
+      return `${num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ل.ل`;
+    case 'EUR':
+      return `€${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    case 'GBP':
+      return `£${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    case 'JPY':
+      return `¥${num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+    case 'USD':
+    default:
+      return `$${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+};
 
 export default function WalletsPage() {
+  const [wallets, setWallets] = useState([]);
+  const [stats, setStats] = useState({ total: 0, active: 0, frozen: 0 });
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const fetchWallets = useCallback(async (showRefresh = false) => {
+    try {
+      if (showRefresh) {
+        setIsRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+
+      const response = await apiClient.get('/api/admin/wallets');
+      const walletsData = Array.isArray(response.data) ? response.data : [];
+      
+      // Transform data to include user info
+      const transformedWallets = walletsData.map((wallet) => ({
+        id: wallet.id,
+        walletId: wallet.id,
+        userId: wallet.user_id,
+        user: wallet.user_name || wallet.name || 'Unknown User',
+        email: wallet.user_email || wallet.email || 'N/A',
+        currency: wallet.currency_code,
+        balance: parseFloat(wallet.balance || 0),
+        status: wallet.status || 'active',
+        address: wallet.address,
+      }));
+
+      setWallets(transformedWallets);
+
+      // Calculate stats
+      const totalWallets = transformedWallets.length;
+      const activeWallets = transformedWallets.filter(w => w.status === 'active').length;
+      const frozenWallets = transformedWallets.filter(w => w.status === 'frozen').length;
+
+      setStats({
+        total: totalWallets,
+        active: activeWallets,
+        frozen: frozenWallets,
+      });
+    } catch (error) {
+      console.error('Failed to fetch wallets:', error);
+      toast.error('Failed to load wallets');
+    } finally {
+      setLoading(false);
+      setIsRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchWallets();
+  }, [fetchWallets]);
+
+  const handleCreditSuccess = (data) => {
+    console.log('[WalletsPage] Credit success callback, data:', data);
+    toast.success('Refreshing wallet data...');
+    // Don't refresh if we're about to navigate away
+    // fetchWallets(true);
+  };
+
+  const filteredWallets = wallets.filter((wallet) => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      wallet.email?.toLowerCase().includes(query) ||
+      wallet.user?.toLowerCase().includes(query) ||
+      wallet.currency?.toLowerCase().includes(query)
+    );
+  });
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Wallets</h1>
-          <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">Manage user wallets</p>
+          <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">Manage user wallets and credit test funds</p>
         </div>
-        <Button className="bg-amber-500 hover:bg-amber-600 text-gray-900">
-          <Plus className="h-4 w-4 mr-2" />
-          Create Wallet
+        <Button
+          onClick={() => fetchWallets(true)}
+          disabled={isRefreshing}
+          className="bg-gray-800 hover:bg-gray-900 text-white"
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+          Refresh
         </Button>
       </div>
 
@@ -36,7 +139,11 @@ export default function WalletsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-600 dark:text-gray-400 text-sm">Total Wallets</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">1,832</p>
+                {loading ? (
+                  <Skeleton className="h-8 w-24 mt-1" />
+                ) : (
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
+                )}
               </div>
               <div className="p-3 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-500">
                 <Wallet className="h-6 w-6" />
@@ -49,7 +156,11 @@ export default function WalletsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-600 dark:text-gray-400 text-sm">Active Wallets</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">1,756</p>
+                {loading ? (
+                  <Skeleton className="h-8 w-24 mt-1" />
+                ) : (
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.active}</p>
+                )}
               </div>
               <div className="p-3 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-500">
                 <Wallet className="h-6 w-6" />
@@ -62,7 +173,11 @@ export default function WalletsPage() {
             <div className="flex items-center justify-between">
       <div>
                 <p className="text-gray-600 dark:text-gray-400 text-sm">Frozen Wallets</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">76</p>
+                {loading ? (
+                  <Skeleton className="h-8 w-24 mt-1" />
+                ) : (
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.frozen}</p>
+                )}
               </div>
               <div className="p-3 rounded-lg bg-red-500/10 text-red-600 dark:text-red-500">
                 <Wallet className="h-6 w-6" />
@@ -71,6 +186,13 @@ export default function WalletsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Credit Test Funds Panel */}
+      <CreditFundsPanel
+        onSuccess={handleCreditSuccess}
+        redirectToCustomerOnSuccess
+        redirectDelayMs={400}
+      />
 
       {/* Table */}
       <Card className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 shadow-xl">
@@ -81,13 +203,16 @@ export default function WalletsPage() {
               <input
                 type="text"
                 placeholder="Search wallets..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 pr-4 py-2 w-64 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm"
               />
             </div>
-            <Button variant="ghost" size="sm" className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800">
-              <Filter className="h-4 w-4 mr-2" />
-              Filter
-            </Button>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                {filteredWallets.length} {filteredWallets.length === 1 ? 'wallet' : 'wallets'}
+              </span>
+            </div>
           </div>
           
           <div className="overflow-x-auto">
@@ -102,10 +227,44 @@ export default function WalletsPage() {
                 </tr>
               </thead>
               <tbody>
-                {wallets.map((wallet) => {
-                  const Icon = wallet.icon;
+                {loading ? (
+                  // Loading skeleton
+                  Array.from({ length: 5 }).map((_, idx) => (
+                    <tr key={idx} className="border-b border-gray-200 dark:border-gray-800">
+                      <td className="p-4">
+                        <Skeleton className="h-4 w-48 mb-2" />
+                        <Skeleton className="h-3 w-32" />
+                      </td>
+                      <td className="p-4">
+                        <Skeleton className="h-4 w-16" />
+                      </td>
+                      <td className="p-4">
+                        <Skeleton className="h-4 w-24" />
+                      </td>
+                      <td className="p-4">
+                        <Skeleton className="h-6 w-16" />
+                      </td>
+                      <td className="p-4">
+                        <Skeleton className="h-8 w-20" />
+                      </td>
+                    </tr>
+                  ))
+                ) : filteredWallets.length === 0 ? (
+                  // Empty state
+                  <tr>
+                    <td colSpan="5" className="p-8 text-center">
+                      <Coins className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+                      <p className="text-gray-500 dark:text-gray-400">
+                        {searchQuery ? 'No wallets found matching your search' : 'No wallets found'}
+                      </p>
+                    </td>
+                  </tr>
+                ) : (
+                  // Actual wallet data
+                  filteredWallets.map((wallet) => {
+                    const Icon = getCurrencyIcon(wallet.currency);
                   return (
-                    <tr key={wallet.id} className="border-b border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                      <tr key={`${wallet.userId}-${wallet.currency}`} className="border-b border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                       <td className="p-4">
                         <div>
                           <p className="text-gray-900 dark:text-white font-medium">{wallet.user}</p>
@@ -119,12 +278,7 @@ export default function WalletsPage() {
                         </div>
                       </td>
                       <td className="p-4 text-gray-900 dark:text-white font-medium">
-                        {wallet.currency === 'LBP' 
-                          ? `${wallet.balance.toLocaleString()} ل.ل`
-                          : wallet.currency === 'EUR'
-                          ? `€${wallet.balance.toLocaleString()}`
-                          : `$${wallet.balance.toLocaleString()}`
-                        }
+                          {formatBalance(wallet.balance, wallet.currency)}
                       </td>
                       <td className="p-4">
                         <Badge className={
@@ -137,17 +291,20 @@ export default function WalletsPage() {
                       </td>
                       <td className="p-4">
                         <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="sm" className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                              title="View wallet details"
+                            >
                             <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" className="text-gray-600 dark:text-gray-400 hover:text-amber-600 dark:hover:text-amber-400">
-                            <Pencil className="h-4 w-4" />
                           </Button>
                         </div>
                       </td>
                     </tr>
                   );
-                })}
+                  })
+                )}
               </tbody>
             </table>
           </div>

@@ -1,6 +1,6 @@
 import apiClient from '../api/client';
 import { ENDPOINTS } from '../api/endpoints';
-import { clearAuthData, storeAuthData, getStoredToken } from '../auth/storage';
+import { clearAuthData, storeAuthData, getStoredToken, getStoredUser } from '../auth/storage';
 
 // Helper: Check if account is suspended
 const isSuspendedError = (error) => {
@@ -57,6 +57,24 @@ const getErrorData = (error) => {
 const fetchAndStoreUser = async () => {
   const { data } = await apiClient.get(ENDPOINTS.AUTH.ME);
   if (data.user) {
+    // CRITICAL: Log to detect user switching bug
+    const storedUser = getStoredUser();
+    if (storedUser && storedUser.id !== data.user.id) {
+      console.error('[Auth] USER SWITCH DETECTED!', {
+        storedUserId: storedUser.id,
+        storedUserEmail: storedUser.email,
+        fetchedUserId: data.user.id,
+        fetchedUserEmail: data.user.email,
+      });
+      // Clear all auth data to force re-login
+      clearAuthData();
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
+      return null;
+    }
+    
+    console.log('[Auth] Fetched user from /api/auth/me:', data.user.email, 'Role:', data.user.role);
     storeAuthData(null, data.user);
     return data.user;
   }

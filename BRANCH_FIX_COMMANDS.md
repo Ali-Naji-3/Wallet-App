@@ -52,9 +52,9 @@ git add backend/next/lib/email.js
 # Commit with descriptive message
 git commit -m "feat: Add support feature - user support page, admin support management, and email notifications"
 ```
-
-### Step 3: Verify Files Are Committed
+re Committed
 ```bash
+### Step 3: Verify Files A
 # Check that files are now in git history
 git log --oneline -1
 git ls-tree -r HEAD --name-only | grep support

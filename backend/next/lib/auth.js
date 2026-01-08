@@ -20,10 +20,15 @@ export function verifyToken(token) {
   const decoded = jwt.verify(token, secret);
   // Handle both 'id' and 'sub' (Express uses 'sub', Next.js uses 'id')
   const userId = decoded?.id || decoded?.sub;
-  return { 
+  const user = { 
     id: Number(userId), 
     email: decoded?.email,
     role: decoded?.role || 'user',
   };
+  
+  // SECURITY: Log decoded token to help debug user switching issues
+  console.log('[Auth] Token verified:', { userId: user.id, email: user.email, role: user.role });
+  
+  return user;
 }
 

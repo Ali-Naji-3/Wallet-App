@@ -36,8 +36,24 @@ export default function LoginPage() {
   // Use local loading state - it's more reliable than Refine's isLoading
   const isLoading = isLoggingIn || refineIsLoading;
 
-  // Check for suspended message on page load (when redirected from a frozen account)
+  // Check for suspended message or account_credited on page load
   useEffect(() => {
+    // Check for account credited message (from admin credit)
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const message = params.get('message');
+      
+      if (message === 'account_credited') {
+        toast.success('Account Credited!', {
+          description: 'Your wallet has been credited by an administrator. Please login to see your updated balance.',
+          duration: 8000,
+        });
+        // Clean URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    }
+    
+    // Check for suspended message (when redirected from a frozen account)
     const suspendedMessage = sessionStorage.getItem('suspended_message');
     if (suspendedMessage) {
       setAccountIssue({
