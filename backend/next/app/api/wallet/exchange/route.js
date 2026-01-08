@@ -79,14 +79,33 @@ export async function POST(req) {
         );
       }
 
-      // Get FX rate
+      // Get FX rate - try direct lookup first
       const latestRates = await getLatestRatesForBase(sourceCurrency);
-      const ratePair = latestRates.find(r => r.quote_currency === targetCurrency);
+      let ratePair = latestRates.find(r => r.quote_currency === targetCurrency);
       
+      // If direct rate not found, try inverse (e.g., EUR→USD when only USD→EUR exists)
+      if (!ratePair) {
+        const inverseRates = await getLatestRatesForBase(targetCurrency);
+        const inversePair = inverseRates.find(r => r.quote_currency === sourceCurrency);
+        
+        if (inversePair) {
+          // Calculate inverse rate
+          const inverseRate = parseFloat(inversePair.rate);
+          ratePair = {
+            base_currency: sourceCurrency,
+            quote_currency: targetCurrency,
+            rate: 1 / inverseRate,
+            fetched_at: inversePair.fetched_at,
+          };
+          console.log(`[Exchange] Using inverse rate: ${sourceCurrency}→${targetCurrency} = ${ratePair.rate} (from inverse ${targetCurrency}→${sourceCurrency} = ${inverseRate})`);
+        }
+      }
+      
+      // If still not found, return error
       if (!ratePair) {
         await conn.rollback();
         return NextResponse.json(
-          { message: 'FX rate not available for this currency pair' },
+          { message: `FX rate not available for ${sourceCurrency} → ${targetCurrency}` },
           { status: 400 }
         );
       }

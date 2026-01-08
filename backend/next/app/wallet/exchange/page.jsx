@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,12 +14,14 @@ import {
 } from '@/components/ui/select';
 import { RefreshCw, ArrowDown, Loader2, TrendingUp, DollarSign, Euro } from 'lucide-react';
 import { toast } from 'sonner';
+import apiClient from '@/lib/api/client';
 
-const currencies = [
-  { code: 'USD', name: 'US Dollar', symbol: '$', balance: 12450.00, icon: DollarSign, rate: 1 },
-  { code: 'EUR', name: 'Euro', symbol: '€', balance: 8320.50, icon: Euro, rate: 0.92 },
-  { code: 'LBP', name: 'Lebanese Lira', symbol: 'ل.ل', balance: 450000000, icon: DollarSign, rate: 89500 },
-];
+// Currency display configuration (UI properties only)
+const currencyConfig = {
+  USD: { name: 'US Dollar', symbol: '$', icon: DollarSign },
+  EUR: { name: 'Euro', symbol: '€', icon: Euro },
+  LBP: { name: 'Lebanese Lira', symbol: 'ل.ل', icon: DollarSign },
+};
 
 export default function ExchangePage() {
   const [isLoading, setIsLoading] = useState(false);
@@ -27,11 +29,132 @@ export default function ExchangePage() {
   const [toCurrency, setToCurrency] = useState('EUR');
   const [fromAmount, setFromAmount] = useState('');
   const [toAmount, setToAmount] = useState('');
+  const [wallets, setWallets] = useState([]);
+  const [loadingWallets, setLoadingWallets] = useState(true);
+  const [exchangeRates, setExchangeRates] = useState({});
 
-  const fromCurrencyData = currencies.find(c => c.code === fromCurrency);
-  const toCurrencyData = currencies.find(c => c.code === toCurrency);
+  // Helper function to format balance (removes duplicate code)
+  const formatBalance = (balance, currencyCode) => {
+    const numericBalance = parseFloat(balance) || 0;
+    if (currencyCode === 'LBP') {
+      return numericBalance.toLocaleString('en-US', { maximumFractionDigits: 0 });
+    }
+    return numericBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  // Fetch real wallet balances from backend
+  const fetchWallets = async () => {
+    try {
+      setLoadingWallets(true);
+      const response = await apiClient.get('/api/wallets/my');
+      const walletsData = response.data || [];
+      
+      // Only show USD, EUR, LBP
+      const filtered = walletsData.filter(w => 
+        ['USD', 'EUR', 'LBP'].includes(w.currency_code)
+      );
+      
+      setWallets(filtered);
+      console.log('✅ Wallets refreshed:', filtered); // Debug log
+    } catch (error) {
+      console.error('Failed to fetch wallets:', error);
+      toast.error('Failed to load wallet balances');
+    } finally {
+      setLoadingWallets(false);
+    }
+  };
+
+  // Fetch exchange rates from backend
+  const fetchExchangeRates = async () => {
+    try {
+      const response = await apiClient.get('/api/wallets/fx/latest?base=USD');
+      if (response.data?.rates && Array.isArray(response.data.rates)) {
+        // Transform array [{quote_currency: "EUR", rate: 0.85}] 
+        // into object {EUR: 0.85, USD: 1, LBP: 89500}
+        const ratesObject = response.data.rates.reduce((acc, r) => {
+          acc[r.quote_currency] = r.rate;
+          return acc;
+        }, {});
+        setExchangeRates(ratesObject);
+        console.log('✅ Exchange rates loaded:', ratesObject);
+      }
+    } catch (error) {
+      console.error('Failed to fetch FX rates:', error);
+      // Use fallback rates if API fails (USD base)
+      setExchangeRates({
+        USD: 1,
+        EUR: 0.92,
+        LBP: 89500,
+      });
+    }
+  };
+
+  useEffect(() => {
+    fetchWallets();
+    fetchExchangeRates();
+  }, []);
+
+  // Log balance updates for debugging
+  useEffect(() => {
+    if (wallets.length > 0) {
+      const usd = wallets.find(w => w.currency_code === 'USD');
+      const eur = wallets.find(w => w.currency_code === 'EUR');
+      const lbp = wallets.find(w => w.currency_code === 'LBP');
+      console.log('💰 Balances updated:', {
+        USD: usd?.balance,
+        EUR: eur?.balance,
+        LBP: lbp?.balance
+      });
+    }
+  }, [wallets]);
+
+  // Log exchange rate changes (only when they actually change)
+  useEffect(() => {
+    if (fromCurrency && toCurrency && exchangeRates[fromCurrency] && exchangeRates[toCurrency]) {
+      const fromRate = exchangeRates[fromCurrency];
+      const toRate = exchangeRates[toCurrency];
+      const rate = toRate / fromRate;
+      console.log(`📊 Exchange rate: ${fromCurrency}(${fromRate}) → ${toCurrency}(${toRate}) = ${rate.toFixed(4)}`);
+    }
+  }, [fromCurrency, toCurrency, exchangeRates]);
+
+  // Recalculate TO amount when currencies or exchange rates change
+  useEffect(() => {
+    if (fromAmount && !isNaN(parseFloat(fromAmount))) {
+      const fromRate = exchangeRates[fromCurrency] || 1;
+      const toRate = exchangeRates[toCurrency] || 1;
+      const rate = toRate / fromRate;
+      const newToAmount = (parseFloat(fromAmount) * rate).toFixed(2);
+      setToAmount(newToAmount);
+    }
+  }, [fromCurrency, toCurrency, exchangeRates]);
+
+  // Get current wallet data
+  const fromWallet = wallets.find(w => w.currency_code === fromCurrency);
+  const toWallet = wallets.find(w => w.currency_code === toCurrency);
   
-  const exchangeRate = toCurrencyData.rate / fromCurrencyData.rate;
+  const fromCurrencyData = {
+    code: fromCurrency,
+    balance: fromWallet ? parseFloat(fromWallet.balance) : 0,
+    ...currencyConfig[fromCurrency],
+  };
+  
+  const toCurrencyData = {
+    code: toCurrency,
+    balance: toWallet ? parseFloat(toWallet.balance) : 0,
+    ...currencyConfig[toCurrency],
+  };
+  
+  // Calculate exchange rate
+  const fromRate = exchangeRates[fromCurrency] || 1;
+  const toRate = exchangeRates[toCurrency] || 1;
+  const exchangeRate = toRate / fromRate;
+
+  // Build currency list for selects
+  const availableCurrencies = ['USD', 'EUR', 'LBP'].map(code => ({
+    code,
+    ...currencyConfig[code],
+  }));
 
   const handleFromAmountChange = (value) => {
     setFromAmount(value);
@@ -60,15 +183,63 @@ export default function ExchangePage() {
 
   const handleExchange = async (e) => {
     e.preventDefault();
+    
+    // Client-side validation
+    const numericAmount = parseFloat(fromAmount);
+    if (!numericAmount || numericAmount <= 0) {
+      toast.error('Please enter a valid amount');
+      return;
+    }
+    
+    if (numericAmount > fromCurrencyData.balance) {
+      toast.error(`Insufficient ${fromCurrency} balance. Available: ${fromCurrencyData.symbol}${fromCurrencyData.balance.toFixed(2)}`);
+      return;
+    }
+    
     setIsLoading(true);
     
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    toast.success(`Successfully exchanged ${fromCurrencyData.symbol}${fromAmount} to ${toCurrencyData.symbol}${toAmount}`);
-    setIsLoading(false);
-    setFromAmount('');
-    setToAmount('');
+    try {
+      // Call real backend API
+      const response = await apiClient.post('/api/wallet/exchange', {
+        sourceCurrency: fromCurrency,
+        targetCurrency: toCurrency,
+        amount: numericAmount,
+        note: `Exchange ${fromCurrency} → ${toCurrency}`,
+      });
+      
+      // Success
+      toast.success(
+        response.data.message || 
+        `Successfully exchanged ${fromCurrencyData.symbol}${numericAmount.toFixed(2)} to ${toCurrencyData.symbol}${response.data.transaction.targetAmount.toFixed(2)}`
+      );
+      
+      // Refresh wallet balances
+      await fetchWallets();
+      
+      // Reset form
+      setFromAmount('');
+      setToAmount('');
+      
+    } catch (error) {
+      console.error('Exchange failed:', error);
+      const errorMessage = error.response?.data?.message || 'Exchange failed. Please try again.';
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  // Show loading state while fetching wallets
+  if (loadingWallets) {
+    return (
+      <div className="max-w-lg mx-auto flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-purple-600 dark:text-purple-400 mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-slate-400">Loading wallets...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-lg mx-auto space-y-6">
@@ -107,7 +278,7 @@ export default function ExchangePage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-white dark:bg-slate-900 border-gray-200 dark:border-slate-700">
-                    {currencies.map((c) => (
+                    {availableCurrencies.map((c) => (
                       <SelectItem
                         key={c.code}
                         value={c.code}
@@ -130,7 +301,7 @@ export default function ExchangePage() {
                 />
               </div>
               <p className="text-xs text-gray-500 dark:text-slate-500">
-                Balance: {fromCurrencyData.symbol}{fromCurrencyData.balance.toLocaleString()}
+                Balance: {fromCurrencyData.symbol}{formatBalance(fromCurrencyData.balance, fromCurrency)}
               </p>
             </div>
 
@@ -156,7 +327,7 @@ export default function ExchangePage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-white dark:bg-slate-900 border-gray-200 dark:border-slate-700">
-                    {currencies.map((c) => (
+                    {availableCurrencies.map((c) => (
                       <SelectItem
                         key={c.code}
                         value={c.code}
@@ -179,7 +350,7 @@ export default function ExchangePage() {
                 />
               </div>
               <p className="text-xs text-gray-500 dark:text-slate-500">
-                Balance: {toCurrencyData.symbol}{toCurrencyData.balance.toLocaleString()}
+                Balance: {toCurrencyData.symbol}{formatBalance(toCurrencyData.balance, toCurrency)}
               </p>
             </div>
 
