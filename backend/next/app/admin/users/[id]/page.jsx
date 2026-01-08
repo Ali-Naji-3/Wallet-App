@@ -22,6 +22,7 @@ import { ENDPOINTS } from '@/lib/api/endpoints';
 import { toast } from 'sonner';
 import {
   ArrowLeft,
+  ArrowRight,
   Edit,
   Mail,
   Calendar,
@@ -120,6 +121,21 @@ export default function UserShowPage() {
     }
   };
 
+  const fetchTransactions = async () => {
+    try {
+      console.log('[UserDetail] Fetching transactions for user:', userId);
+      const { data } = await apiClient.get(
+        ENDPOINTS.ADMIN_USERS.TRANSACTIONS(userId),
+        { params: { type: 'exchange', limit: 50 } }
+      );
+      setTransactions(data.transactions || []);
+      console.log('[UserDetail] Transactions loaded:', data.transactions?.length || 0);
+    } catch (err) {
+      console.error('[UserDetail] Failed to fetch transactions:', err);
+      // Don't show error toast, just log it
+    }
+  };
+
   useEffect(() => {
     console.log('[UserDetail] useEffect triggered, userId:', userId);
     if (userId) {
@@ -127,9 +143,11 @@ export default function UserShowPage() {
       setUser(null);
       setWallets([]);
       setStats(null);
+      setTransactions([]);
       setError('');
       
       fetchUser();
+      fetchTransactions();
     }
     
     // Cleanup function to reset state on unmount
@@ -602,15 +620,63 @@ export default function UserShowPage() {
 
         {/* Activity Tab */}
         <TabsContent value="activity" className="space-y-4">
-          <Card className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <TrendingUp className="h-12 w-12 text-gray-400 mb-4" />
-              <p className="text-gray-600 dark:text-gray-400">Activity log coming soon</p>
-              <p className="text-sm text-gray-500 dark:text-gray-500">
-                User has {stats?.totalTransactions || 0} transactions
-              </p>
-            </CardContent>
-          </Card>
+          {transactions.length === 0 ? (
+            <Card className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <TrendingUp className="h-12 w-12 text-gray-400 mb-4" />
+                <p className="text-gray-600 dark:text-gray-400">No exchange transactions yet</p>
+                <p className="text-sm text-gray-500 dark:text-gray-500">
+                  Exchanges will appear here when the user performs currency exchanges
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Exchange History
+                  </h3>
+                  <Badge className="bg-blue-500/20 text-blue-600 dark:text-blue-400">
+                    {transactions.length} {transactions.length === 1 ? 'Exchange' : 'Exchanges'}
+                  </Badge>
+                </div>
+                <div className="space-y-3">
+                  {transactions.map((tx) => (
+                    <div
+                      key={tx.id}
+                      className="flex justify-between items-center p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="font-semibold text-gray-900 dark:text-white">
+                            {parseFloat(tx.source_amount).toFixed(2)} {tx.source_currency}
+                          </p>
+                          <ArrowRight className="h-4 w-4 text-gray-400" />
+                          <p className="font-semibold text-gray-900 dark:text-white">
+                            {parseFloat(tx.target_amount).toFixed(2)} {tx.target_currency}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+                          <span>Rate: {parseFloat(tx.fx_rate).toFixed(6)}</span>
+                          <span>•</span>
+                          <span>{format(new Date(tx.created_at), 'MMM dd, yyyy HH:mm')}</span>
+                        </div>
+                        {tx.note && (
+                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                            {tx.note}
+                          </p>
+                        )}
+                      </div>
+                      <Badge className="bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+                        Exchange
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* KYC Tab */}
