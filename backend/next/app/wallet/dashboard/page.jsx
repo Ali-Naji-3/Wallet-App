@@ -96,14 +96,7 @@ const currencyConfig = {
   },
 };
 
-const recentTransactions = [
-  { id: 1, type: 'received', name: 'John Smith', amount: '+$500.00', time: '2 hours ago', status: 'completed' },
-  { id: 2, type: 'sent', name: 'Amazon Purchase', amount: '-$89.99', time: '5 hours ago', status: 'completed' },
-  { id: 3, type: 'exchange', name: 'USD → EUR', amount: '$200.00', time: 'Yesterday', status: 'completed' },
-  { id: 4, type: 'received', name: 'Sarah Johnson', amount: '+$1,200.00', time: 'Yesterday', status: 'completed' },
-  { id: 5, type: 'sent', name: 'Netflix', amount: '-$15.99', time: '2 days ago', status: 'completed' },
-];
-
+// Quick actions configuration
 const quickActions = [
   { name: 'Send', href: '/wallet/send', icon: Send, color: 'bg-blue-500' },
   { name: 'Receive', href: '/wallet/receive', icon: Download, color: 'bg-emerald-500' },
@@ -128,20 +121,22 @@ export default function WalletDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const [walletBalances, setWalletBalances] = useState([]);
   const [isLoadingBalances, setIsLoadingBalances] = useState(true);
-  
+  const [transactions, setTransactions] = useState([]);
+  const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
+
   // Fetch real wallet balances from backend
   const fetchWalletBalances = async () => {
     try {
       const response = await apiClient.get('/api/wallets/my');
       const wallets = response.data || [];
-      
+
       // Default visible currencies (user can add more later via "Add Card")
       const defaultCurrencies = ['USD', 'EUR', 'LBP'];
-      
+
       // Merge API balances with static display properties
       const mergedBalances = wallets
-        .filter(wallet => 
-          currencyConfig[wallet.currency_code] && 
+        .filter(wallet =>
+          currencyConfig[wallet.currency_code] &&
           defaultCurrencies.includes(wallet.currency_code) // Only show USD, EUR, LBP by default
         )
         .map(wallet => ({
@@ -151,7 +146,7 @@ export default function WalletDashboard() {
           trend: 'up', // Static for now (can be calculated later)
           ...currencyConfig[wallet.currency_code],
         }));
-      
+
       // If API returns wallets, use them; otherwise, show default currencies with zero balance
       if (mergedBalances.length > 0) {
         setWalletBalances(mergedBalances);
@@ -182,9 +177,23 @@ export default function WalletDashboard() {
     }
   };
 
-  // Fetch balances on component mount
+  // Fetch recent transactions
+  const fetchRecentTransactions = async () => {
+    try {
+      const response = await apiClient.get('/api/transactions/my');
+      setTransactions(response.data.transactions || []);
+    } catch (error) {
+      console.error('Failed to fetch transactions:', error);
+      toast.error('Failed to load recent transactions');
+    } finally {
+      setIsLoadingTransactions(false);
+    }
+  };
+
+  // Fetch data on component mount
   useEffect(() => {
     fetchWalletBalances();
+    fetchRecentTransactions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -222,7 +231,10 @@ export default function WalletDashboard() {
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await fetchWalletBalances();
+    await Promise.all([
+      fetchWalletBalances(),
+      fetchRecentTransactions()
+    ]);
     setIsRefreshing(false);
   };
 
@@ -234,7 +246,7 @@ export default function WalletDashboard() {
   };
 
   const heroCard = displayWallets[safeHeroCardIndex];
-  
+
   // Get all cards except the one in hero position
   const carouselCards = displayWallets.filter((_, index) => index !== safeHeroCardIndex);
 
@@ -252,465 +264,480 @@ export default function WalletDashboard() {
       </TabsList>
 
       <TabsContent value="overview" className="space-y-8">
-      {/* Premium Hero Balance Card - Dynamic Card Style */}
-      <Card className={`bg-gradient-to-br ${heroCard.cardColor} border-0 overflow-hidden relative shadow-2xl transition-all duration-500`}>
-        <CardContent className="p-8">
-          {/* Decorative elements - unique per card type */}
-          {heroCard.cardType === 'BLACK' ? (
-            <>
-              <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-              <div className="absolute bottom-0 left-0 w-48 h-48 bg-black/30 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2" />
-            </>
-          ) : heroCard.cardType === 'GOLD' ? (
-            <>
-              <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-400/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-              <div className="absolute bottom-0 left-0 w-48 h-48 bg-amber-600/20 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2" />
-            </>
-          ) : (
-            <>
-              <div className="absolute top-0 right-0 w-64 h-64 bg-slate-400/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-              <div className="absolute bottom-0 left-0 w-48 h-48 bg-slate-600/20 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2" />
-            </>
-          )}
-          
-          <div className="relative z-10">
-            {/* Header with controls */}
-            <div className="flex items-center justify-between mb-8">
-              <div className="flex items-center gap-2">
-                {(() => {
-                  const Icon = heroCard.icon;
-                  return <Icon className={`h-5 w-5 ${heroCard.textColor} opacity-70`} />;
-                })()}
-                <span className={`text-sm font-semibold ${heroCard.textColor} opacity-70`}>FXWallet {heroCard.cardType}</span>
-                <span className={`text-xs ${heroCard.textColor} opacity-50`}>• {heroCard.currency}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setBalanceVisible(!balanceVisible)}
-                  className={`p-2 rounded-lg transition-colors ${
-                    heroCard.textColor === 'text-white' ? 'hover:bg-white/10' : 'hover:bg-black/10'
-                  }`}
-                  aria-label={balanceVisible ? 'Hide balance' : 'Show balance'}
-                >
-                  {balanceVisible ? (
-                    <Eye className={`h-5 w-5 ${heroCard.textColor} opacity-80`} />
-                  ) : (
-                    <EyeOff className={`h-5 w-5 ${heroCard.textColor} opacity-80`} />
-                  )}
-                </button>
-                <button
-                  onClick={handleRefresh}
-                  disabled={isRefreshing}
-                  className={`p-2 rounded-lg transition-colors disabled:opacity-50 ${
-                    heroCard.textColor === 'text-white' ? 'hover:bg-white/10' : 'hover:bg-black/10'
-                  }`}
-                  aria-label="Refresh balance"
-                >
-                  <RefreshCw className={`h-5 w-5 ${heroCard.textColor} opacity-80 ${isRefreshing ? 'animate-spin' : ''}`} />
-                </button>
-              </div>
-            </div>
+        {/* Premium Hero Balance Card - Dynamic Card Style */}
+        <Card className={`bg-gradient-to-br ${heroCard.cardColor} border-0 overflow-hidden relative shadow-2xl transition-all duration-500`}>
+          <CardContent className="p-8">
+            {/* Decorative elements - unique per card type */}
+            {heroCard.cardType === 'BLACK' ? (
+              <>
+                <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+                <div className="absolute bottom-0 left-0 w-48 h-48 bg-black/30 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2" />
+              </>
+            ) : heroCard.cardType === 'GOLD' ? (
+              <>
+                <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-400/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+                <div className="absolute bottom-0 left-0 w-48 h-48 bg-amber-600/20 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2" />
+              </>
+            ) : (
+              <>
+                <div className="absolute top-0 right-0 w-64 h-64 bg-slate-400/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+                <div className="absolute bottom-0 left-0 w-48 h-48 bg-slate-600/20 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2" />
+              </>
+            )}
 
-            {/* Main Balance Display */}
-            <div className="mb-8">
-              {balanceVisible ? (
-                <div>
-                  <p className={`text-6xl font-bold ${heroCard.textColor} mb-3 tracking-tight`}>
-                    {heroCard.currency === 'LBP' 
-                      ? `${heroCard.balance.toLocaleString('en-US', { maximumFractionDigits: 0 })} ${heroCard.symbol}`
-                      : `${heroCard.symbol}${heroCard.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                    }
-                  </p>
-                  <div className="flex items-center gap-3">
-                    <div className={`flex items-center gap-1 px-3 py-1.5 rounded-full border ${
-                      heroCard.trend === 'up' 
-                        ? 'bg-emerald-500/20 border-emerald-500/30' 
-                        : 'bg-red-500/20 border-red-500/30'
-                    }`}>
-                      {heroCard.trend === 'up' ? (
-                        <ArrowUpRight className="h-4 w-4 text-emerald-400" />
-                      ) : (
-                        <ArrowDownRight className="h-4 w-4 text-red-400" />
-                      )}
-                      <span className={`text-sm font-bold ${heroCard.trend === 'up' ? 'text-emerald-400' : 'text-red-400'}`}>
-                        {heroCard.change}
-                      </span>
+            <div className="relative z-10">
+              {/* Header with controls */}
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-2">
+                  {(() => {
+                    const Icon = heroCard.icon;
+                    return <Icon className={`h-5 w-5 ${heroCard.textColor} opacity-70`} />;
+                  })()}
+                  <span className={`text-sm font-semibold ${heroCard.textColor} opacity-70`}>FXWallet {heroCard.cardType}</span>
+                  <span className={`text-xs ${heroCard.textColor} opacity-50`}>• {heroCard.currency}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setBalanceVisible(!balanceVisible)}
+                    className={`p-2 rounded-lg transition-colors ${heroCard.textColor === 'text-white' ? 'hover:bg-white/10' : 'hover:bg-black/10'
+                      }`}
+                    aria-label={balanceVisible ? 'Hide balance' : 'Show balance'}
+                  >
+                    {balanceVisible ? (
+                      <Eye className={`h-5 w-5 ${heroCard.textColor} opacity-80`} />
+                    ) : (
+                      <EyeOff className={`h-5 w-5 ${heroCard.textColor} opacity-80`} />
+                    )}
+                  </button>
+                  <button
+                    onClick={handleRefresh}
+                    disabled={isRefreshing}
+                    className={`p-2 rounded-lg transition-colors disabled:opacity-50 ${heroCard.textColor === 'text-white' ? 'hover:bg-white/10' : 'hover:bg-black/10'
+                      }`}
+                    aria-label="Refresh balance"
+                  >
+                    <RefreshCw className={`h-5 w-5 ${heroCard.textColor} opacity-80 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Main Balance Display */}
+              <div className="mb-8">
+                {balanceVisible ? (
+                  <div>
+                    <p className={`text-6xl font-bold ${heroCard.textColor} mb-3 tracking-tight`}>
+                      {heroCard.currency === 'LBP'
+                        ? `${heroCard.balance.toLocaleString('en-US', { maximumFractionDigits: 0 })} ${heroCard.symbol}`
+                        : `${heroCard.symbol}${heroCard.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      }
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <div className={`flex items-center gap-1 px-3 py-1.5 rounded-full border ${heroCard.trend === 'up'
+                          ? 'bg-emerald-500/20 border-emerald-500/30'
+                          : 'bg-red-500/20 border-red-500/30'
+                        }`}>
+                        {heroCard.trend === 'up' ? (
+                          <ArrowUpRight className="h-4 w-4 text-emerald-400" />
+                        ) : (
+                          <ArrowDownRight className="h-4 w-4 text-red-400" />
+                        )}
+                        <span className={`text-sm font-bold ${heroCard.trend === 'up' ? 'text-emerald-400' : 'text-red-400'}`}>
+                          {heroCard.change}
+                        </span>
+                      </div>
+                      <span className={`${heroCard.textColor} opacity-60 text-sm`}>{heroCard.currency} Wallet</span>
                     </div>
-                    <span className={`${heroCard.textColor} opacity-60 text-sm`}>{heroCard.currency} Wallet</span>
+                  </div>
+                ) : (
+                  <div>
+                    <p className={`text-6xl font-bold ${heroCard.textColor} mb-3 tracking-tight`}>
+                      •••••••
+                    </p>
+                    <p className={`${heroCard.textColor} opacity-60 text-sm`}>Balance hidden</p>
+                  </div>
+                )}
+
+                {/* Card Details - Bottom Right */}
+                <div className="absolute bottom-8 right-8 text-right">
+                  <p className={`text-xs ${heroCard.textColor} opacity-50 mb-1 tracking-widest`}>
+                    •••• •••• •••• {heroCard.cardNumber}
+                  </p>
+                  <p className={`text-sm ${heroCard.textColor} opacity-70 font-medium`}>
+                    Herman Psht
+                  </p>
+                </div>
+              </div>
+
+              {/* Mini Sparkline Chart */}
+              <div className={`relative h-24 backdrop-blur-sm rounded-2xl p-4 overflow-hidden border ${heroCard.cardType === 'BLACK'
+                  ? 'bg-white/5 border-white/10'
+                  : heroCard.cardType === 'GOLD'
+                    ? 'bg-yellow-400/10 border-yellow-400/20'
+                    : 'bg-slate-400/10 border-slate-400/20'
+                }`}>
+                <svg
+                  className="absolute inset-0 w-full h-full"
+                  viewBox="0 0 200 60"
+                  preserveAspectRatio="none"
+                >
+                  {/* Gradient definitions - unique per card type */}
+                  <defs>
+                    {heroCard.cardType === 'BLACK' ? (
+                      <>
+                        <linearGradient id="heroChartGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                          <stop offset="0%" stopColor="rgb(16, 185, 129)" stopOpacity="0.3" />
+                          <stop offset="100%" stopColor="rgb(16, 185, 129)" stopOpacity="0" />
+                        </linearGradient>
+                        <linearGradient id="heroChartLine" x1="0%" y1="0%" x2="100%" y2="0%">
+                          <stop offset="0%" stopColor="rgb(255, 255, 255)" stopOpacity="0.6" />
+                          <stop offset="100%" stopColor="rgb(16, 185, 129)" stopOpacity="1" />
+                        </linearGradient>
+                      </>
+                    ) : heroCard.cardType === 'GOLD' ? (
+                      <>
+                        <linearGradient id="heroChartGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                          <stop offset="0%" stopColor="rgb(251, 191, 36)" stopOpacity="0.4" />
+                          <stop offset="100%" stopColor="rgb(251, 191, 36)" stopOpacity="0" />
+                        </linearGradient>
+                        <linearGradient id="heroChartLine" x1="0%" y1="0%" x2="100%" y2="0%">
+                          <stop offset="0%" stopColor="rgb(255, 255, 255)" stopOpacity="0.8" />
+                          <stop offset="100%" stopColor="rgb(251, 191, 36)" stopOpacity="1" />
+                        </linearGradient>
+                      </>
+                    ) : (
+                      <>
+                        <linearGradient id="heroChartGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                          <stop offset="0%" stopColor="rgb(148, 163, 184)" stopOpacity="0.3" />
+                          <stop offset="100%" stopColor="rgb(148, 163, 184)" stopOpacity="0" />
+                        </linearGradient>
+                        <linearGradient id="heroChartLine" x1="0%" y1="0%" x2="100%" y2="0%">
+                          <stop offset="0%" stopColor="rgb(255, 255, 255)" stopOpacity="0.7" />
+                          <stop offset="100%" stopColor="rgb(148, 163, 184)" stopOpacity="1" />
+                        </linearGradient>
+                      </>
+                    )}
+                  </defs>
+
+                  {/* Area fill under the line */}
+                  <path
+                    d={`M 0,${60 - ((chartData[0] - Math.min(...chartData)) / (Math.max(...chartData) - Math.min(...chartData))) * 50} ${chartData.map((value, index) => {
+                      const x = (index / (chartData.length - 1)) * 200;
+                      const normalizedValue = (value - Math.min(...chartData)) / (Math.max(...chartData) - Math.min(...chartData));
+                      const y = 60 - (normalizedValue * 50);
+                      return `L ${x},${y}`;
+                    }).join(' ')} L 200,60 L 0,60 Z`}
+                    fill="url(#heroChartGradient)"
+                    className="transition-all duration-300"
+                  />
+
+                  {/* Main line */}
+                  <path
+                    d={`M 0,${60 - ((chartData[0] - Math.min(...chartData)) / (Math.max(...chartData) - Math.min(...chartData))) * 50} ${chartData.map((value, index) => {
+                      const x = (index / (chartData.length - 1)) * 200;
+                      const normalizedValue = (value - Math.min(...chartData)) / (Math.max(...chartData) - Math.min(...chartData));
+                      const y = 60 - (normalizedValue * 50);
+                      return `L ${x},${y}`;
+                    }).join(' ')}`}
+                    fill="none"
+                    stroke="url(#heroChartLine)"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="transition-all duration-300"
+                  />
+
+                  {/* Data points */}
+                  {chartData.map((value, index) => {
+                    const x = (index / (chartData.length - 1)) * 200;
+                    const normalizedValue = (value - Math.min(...chartData)) / (Math.max(...chartData) - Math.min(...chartData));
+                    const y = 60 - (normalizedValue * 50);
+                    const isLast = index === chartData.length - 1;
+                    const pointColor = heroCard.cardType === 'BLACK'
+                      ? (isLast ? "rgb(16, 185, 129)" : "rgb(255, 255, 255)")
+                      : heroCard.cardType === 'GOLD'
+                        ? (isLast ? "rgb(251, 191, 36)" : "rgb(255, 255, 255)")
+                        : (isLast ? "rgb(148, 163, 184)" : "rgb(255, 255, 255)");
+                    return (
+                      <circle
+                        key={index}
+                        cx={x}
+                        cy={y}
+                        r={isLast ? 4 : 0}
+                        fill={pointColor}
+                        className="transition-all duration-300"
+                      />
+                    );
+                  })}
+                </svg>
+
+                {/* Chart Labels */}
+                <div className="relative z-10 flex items-center justify-between mt-auto pt-2">
+                  <span className={`text-xs font-medium ${heroCard.textColor === 'text-white' ? 'text-white/60' : 'text-black/60'
+                    }`}>Last 7 days</span>
+                  <div className="flex items-center gap-1">
+                    <TrendingUp className={`h-3 w-3 ${heroCard.cardType === 'BLACK' ? 'text-emerald-400' :
+                        heroCard.cardType === 'GOLD' ? 'text-yellow-400' :
+                          'text-slate-400'
+                      }`} />
+                    <span className={`text-xs font-semibold ${heroCard.cardType === 'BLACK' ? 'text-emerald-400' :
+                        heroCard.cardType === 'GOLD' ? 'text-yellow-400' :
+                          'text-slate-400'
+                      }`}>Growth</span>
                   </div>
                 </div>
-              ) : (
-                <div>
-                  <p className={`text-6xl font-bold ${heroCard.textColor} mb-3 tracking-tight`}>
-                    •••••••
-                  </p>
-                  <p className={`${heroCard.textColor} opacity-60 text-sm`}>Balance hidden</p>
-                </div>
-              )}
-              
-              {/* Card Details - Bottom Right */}
-              <div className="absolute bottom-8 right-8 text-right">
-                <p className={`text-xs ${heroCard.textColor} opacity-50 mb-1 tracking-widest`}>
-                  •••• •••• •••• {heroCard.cardNumber}
-                </p>
-                <p className={`text-sm ${heroCard.textColor} opacity-70 font-medium`}>
-                  Herman Psht
-                </p>
               </div>
             </div>
+          </CardContent>
+        </Card>
 
-            {/* Mini Sparkline Chart */}
-            <div className={`relative h-24 backdrop-blur-sm rounded-2xl p-4 overflow-hidden border ${
-              heroCard.cardType === 'BLACK' 
-                ? 'bg-white/5 border-white/10' 
-                : heroCard.cardType === 'GOLD'
-                ? 'bg-yellow-400/10 border-yellow-400/20'
-                : 'bg-slate-400/10 border-slate-400/20'
-            }`}>
-              <svg
-                className="absolute inset-0 w-full h-full"
-                viewBox="0 0 200 60"
-                preserveAspectRatio="none"
-              >
-                {/* Gradient definitions - unique per card type */}
-                <defs>
-                  {heroCard.cardType === 'BLACK' ? (
-                    <>
-                      <linearGradient id="heroChartGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" stopColor="rgb(16, 185, 129)" stopOpacity="0.3" />
-                        <stop offset="100%" stopColor="rgb(16, 185, 129)" stopOpacity="0" />
-                      </linearGradient>
-                      <linearGradient id="heroChartLine" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stopColor="rgb(255, 255, 255)" stopOpacity="0.6" />
-                        <stop offset="100%" stopColor="rgb(16, 185, 129)" stopOpacity="1" />
-                      </linearGradient>
-                    </>
-                  ) : heroCard.cardType === 'GOLD' ? (
-                    <>
-                      <linearGradient id="heroChartGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" stopColor="rgb(251, 191, 36)" stopOpacity="0.4" />
-                        <stop offset="100%" stopColor="rgb(251, 191, 36)" stopOpacity="0" />
-                      </linearGradient>
-                      <linearGradient id="heroChartLine" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stopColor="rgb(255, 255, 255)" stopOpacity="0.8" />
-                        <stop offset="100%" stopColor="rgb(251, 191, 36)" stopOpacity="1" />
-                      </linearGradient>
-                    </>
-                  ) : (
-                    <>
-                      <linearGradient id="heroChartGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" stopColor="rgb(148, 163, 184)" stopOpacity="0.3" />
-                        <stop offset="100%" stopColor="rgb(148, 163, 184)" stopOpacity="0" />
-                      </linearGradient>
-                      <linearGradient id="heroChartLine" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stopColor="rgb(255, 255, 255)" stopOpacity="0.7" />
-                        <stop offset="100%" stopColor="rgb(148, 163, 184)" stopOpacity="1" />
-                      </linearGradient>
-                    </>
-                  )}
-                </defs>
-                
-                {/* Area fill under the line */}
-                <path
-                  d={`M 0,${60 - ((chartData[0] - Math.min(...chartData)) / (Math.max(...chartData) - Math.min(...chartData))) * 50} ${chartData.map((value, index) => {
-                    const x = (index / (chartData.length - 1)) * 200;
-                    const normalizedValue = (value - Math.min(...chartData)) / (Math.max(...chartData) - Math.min(...chartData));
-                    const y = 60 - (normalizedValue * 50);
-                    return `L ${x},${y}`;
-                  }).join(' ')} L 200,60 L 0,60 Z`}
-                  fill="url(#heroChartGradient)"
-                  className="transition-all duration-300"
-                />
-                
-                {/* Main line */}
-                <path
-                  d={`M 0,${60 - ((chartData[0] - Math.min(...chartData)) / (Math.max(...chartData) - Math.min(...chartData))) * 50} ${chartData.map((value, index) => {
-                    const x = (index / (chartData.length - 1)) * 200;
-                    const normalizedValue = (value - Math.min(...chartData)) / (Math.max(...chartData) - Math.min(...chartData));
-                    const y = 60 - (normalizedValue * 50);
-                    return `L ${x},${y}`;
-                  }).join(' ')}`}
-                  fill="none"
-                  stroke="url(#heroChartLine)"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="transition-all duration-300"
-                />
-                
-                {/* Data points */}
-                {chartData.map((value, index) => {
-                  const x = (index / (chartData.length - 1)) * 200;
-                  const normalizedValue = (value - Math.min(...chartData)) / (Math.max(...chartData) - Math.min(...chartData));
-                  const y = 60 - (normalizedValue * 50);
-                  const isLast = index === chartData.length - 1;
-                  const pointColor = heroCard.cardType === 'BLACK' 
-                    ? (isLast ? "rgb(16, 185, 129)" : "rgb(255, 255, 255)")
-                    : heroCard.cardType === 'GOLD'
-                    ? (isLast ? "rgb(251, 191, 36)" : "rgb(255, 255, 255)")
-                    : (isLast ? "rgb(148, 163, 184)" : "rgb(255, 255, 255)");
-                  return (
-                    <circle
-                      key={index}
-                      cx={x}
-                      cy={y}
-                      r={isLast ? 4 : 0}
-                      fill={pointColor}
-                      className="transition-all duration-300"
-                    />
-                  );
-                })}
-              </svg>
-              
-              {/* Chart Labels */}
-              <div className="relative z-10 flex items-center justify-between mt-auto pt-2">
-                <span className={`text-xs font-medium ${
-                  heroCard.textColor === 'text-white' ? 'text-white/60' : 'text-black/60'
-                }`}>Last 7 days</span>
-                <div className="flex items-center gap-1">
-                  <TrendingUp className={`h-3 w-3 ${
-                    heroCard.cardType === 'BLACK' ? 'text-emerald-400' :
-                    heroCard.cardType === 'GOLD' ? 'text-yellow-400' :
-                    'text-slate-400'
-                  }`} />
-                  <span className={`text-xs font-semibold ${
-                    heroCard.cardType === 'BLACK' ? 'text-emerald-400' :
-                    heroCard.cardType === 'GOLD' ? 'text-yellow-400' :
-                    'text-slate-400'
-                  }`}>Growth</span>
-                </div>
-              </div>
-            </div>
+        {/* Horizontal Card Carousel */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">My Cards</h2>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300"
+              onClick={() => {
+                toast.info('Add Card feature coming soon!', {
+                  description: 'You will be able to add GBP, JPY, CHF, CAD, AUD and more.',
+                });
+              }}
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Add Card
+            </Button>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Horizontal Card Carousel */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">My Cards</h2>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300"
-            onClick={() => {
-              toast.info('Add Card feature coming soon!', {
-                description: 'You will be able to add GBP, JPY, CHF, CAD, AUD and more.',
-              });
-            }}
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            Add Card
-          </Button>
-        </div>
-        
-        <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
-          {carouselCards.map((wallet, carouselIndex) => {
-            const Icon = wallet.icon;
-            // Find the original index in displayWallets array
-            const originalIndex = displayWallets.findIndex(w => w.currency === wallet.currency);
-            
-            return (
-              <button
-                key={wallet.currency}
-                onClick={() => handleCardClick(originalIndex)}
-                className="flex-shrink-0 w-80 transition-all duration-300 scale-100 opacity-70 hover:opacity-90 hover:scale-105"
-              >
-                <div 
-                  className={`bg-gradient-to-br ${wallet.cardColor} rounded-2xl p-6 shadow-2xl relative overflow-hidden h-48 border-2 border-transparent hover:border-white/20 transition-all`}
+          <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+            {carouselCards.map((wallet, carouselIndex) => {
+              const Icon = wallet.icon;
+              // Find the original index in displayWallets array
+              const originalIndex = displayWallets.findIndex(w => w.currency === wallet.currency);
+
+              return (
+                <button
+                  key={wallet.currency}
+                  onClick={() => handleCardClick(originalIndex)}
+                  className="flex-shrink-0 w-80 transition-all duration-300 scale-100 opacity-70 hover:opacity-90 hover:scale-105"
                 >
-                  {/* Card decorative pattern */}
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl translate-x-8 -translate-y-8" />
-                  <div className="absolute bottom-0 left-0 w-24 h-24 bg-black/10 rounded-full blur-xl -translate-x-4 translate-y-4" />
-                  
-                  <div className="relative z-10 h-full flex flex-col justify-between">
-                    {/* Card Header */}
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className={`text-xs font-semibold ${wallet.textColor} opacity-70 mb-1`}>
-                          FXWallet {wallet.cardType}
-                        </p>
-                        <div className="flex items-center gap-2">
-                          <Icon className={`h-5 w-5 ${wallet.textColor}`} />
-                          <span className={`text-lg font-bold ${wallet.textColor}`}>
-                            {wallet.currency}
-                          </span>
+                  <div
+                    className={`bg-gradient-to-br ${wallet.cardColor} rounded-2xl p-6 shadow-2xl relative overflow-hidden h-48 border-2 border-transparent hover:border-white/20 transition-all`}
+                  >
+                    {/* Card decorative pattern */}
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl translate-x-8 -translate-y-8" />
+                    <div className="absolute bottom-0 left-0 w-24 h-24 bg-black/10 rounded-full blur-xl -translate-x-4 translate-y-4" />
+
+                    <div className="relative z-10 h-full flex flex-col justify-between">
+                      {/* Card Header */}
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className={`text-xs font-semibold ${wallet.textColor} opacity-70 mb-1`}>
+                            FXWallet {wallet.cardType}
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <Icon className={`h-5 w-5 ${wallet.textColor}`} />
+                            <span className={`text-lg font-bold ${wallet.textColor}`}>
+                              {wallet.currency}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <div className={`w-8 h-8 rounded-full ${wallet.textColor === 'text-white' ? 'bg-white/20' : 'bg-black/20'}`} />
+                          <div className={`w-8 h-8 rounded-full ${wallet.textColor === 'text-white' ? 'bg-white/30' : 'bg-black/30'} -ml-3`} />
                         </div>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <div className={`w-8 h-8 rounded-full ${wallet.textColor === 'text-white' ? 'bg-white/20' : 'bg-black/20'}`} />
-                        <div className={`w-8 h-8 rounded-full ${wallet.textColor === 'text-white' ? 'bg-white/30' : 'bg-black/30'} -ml-3`} />
-                      </div>
-                    </div>
 
-                    {/* Card Number */}
-                    <div>
-                      <p className={`text-sm ${wallet.textColor} opacity-60 mb-2 tracking-wider`}>
-                        •••• •••• •••• {wallet.cardNumber}
-                      </p>
-                      
-                      {/* Balance */}
-                      {balanceVisible ? (
-                        <p className={`text-3xl font-bold ${wallet.textColor}`}>
-                          {wallet.currency === 'LBP' 
-                            ? `${(wallet.balance / 1000000).toFixed(1)}M ${wallet.symbol}`
-                            : `${wallet.symbol}${wallet.balance.toLocaleString('en-US', { maximumFractionDigits: 0 })}`
-                          }
-                        </p>
-                      ) : (
-                        <p className={`text-3xl font-bold ${wallet.textColor}`}>
-                          •••••••
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Card Footer */}
-                    <div className="flex items-center justify-between">
+                      {/* Card Number */}
                       <div>
-                        <p className={`text-xs ${wallet.textColor} opacity-50`}>Herman Psht</p>
-                      </div>
-                      <div className={`flex items-center gap-1 ${
-                        wallet.trend === 'up' ? 'text-emerald-300' : 'text-red-300'
-                      }`}>
-                        {wallet.trend === 'up' ? (
-                          <ArrowUpRight className="h-3 w-3" />
+                        <p className={`text-sm ${wallet.textColor} opacity-60 mb-2 tracking-wider`}>
+                          •••• •••• •••• {wallet.cardNumber}
+                        </p>
+
+                        {/* Balance */}
+                        {balanceVisible ? (
+                          <p className={`text-3xl font-bold ${wallet.textColor}`}>
+                            {wallet.currency === 'LBP'
+                              ? `${(wallet.balance / 1000000).toFixed(1)}M ${wallet.symbol}`
+                              : `${wallet.symbol}${wallet.balance.toLocaleString('en-US', { maximumFractionDigits: 0 })}`
+                            }
+                          </p>
                         ) : (
-                          <ArrowDownRight className="h-3 w-3" />
+                          <p className={`text-3xl font-bold ${wallet.textColor}`}>
+                            •••••••
+                          </p>
                         )}
-                        <span className="text-xs font-semibold">{wallet.change}</span>
+                      </div>
+
+                      {/* Card Footer */}
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className={`text-xs ${wallet.textColor} opacity-50`}>Herman Psht</p>
+                        </div>
+                        <div className={`flex items-center gap-1 ${wallet.trend === 'up' ? 'text-emerald-300' : 'text-red-300'
+                          }`}>
+                          {wallet.trend === 'up' ? (
+                            <ArrowUpRight className="h-3 w-3" />
+                          ) : (
+                            <ArrowDownRight className="h-3 w-3" />
+                          )}
+                          <span className="text-xs font-semibold">{wallet.change}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              </button>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {quickActions.map((action) => {
+            const Icon = action.icon;
+            return (
+              <Link key={action.name} href={action.href}>
+                <Card className="bg-white/80 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 transition-all cursor-pointer group backdrop-blur-sm">
+                  <CardContent className="p-6 flex flex-col items-center text-center">
+                    <div className={`${action.color} p-4 rounded-2xl mb-3 group-hover:scale-110 transition-transform shadow-lg`}>
+                      <Icon className="h-6 w-6 text-white" />
+                    </div>
+                    <span className="text-sm font-semibold text-slate-900 dark:text-white">{action.name}</span>
+                  </CardContent>
+                </Card>
+              </Link>
             );
           })}
         </div>
-      </div>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {quickActions.map((action) => {
-          const Icon = action.icon;
-          return (
-            <Link key={action.name} href={action.href}>
-              <Card className="bg-white/80 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 transition-all cursor-pointer group backdrop-blur-sm">
-                <CardContent className="p-6 flex flex-col items-center text-center">
-                  <div className={`${action.color} p-4 rounded-2xl mb-3 group-hover:scale-110 transition-transform shadow-lg`}>
-                    <Icon className="h-6 w-6 text-white" />
-                  </div>
-                  <span className="text-sm font-semibold text-slate-900 dark:text-white">{action.name}</span>
-                </CardContent>
-              </Card>
-            </Link>
-          );
-        })}
-      </div>
-
-      {/* Current Card Details */}
-      <Card className="bg-white/80 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 backdrop-blur-sm">
-        <CardHeader className="border-b border-slate-200 dark:border-slate-700">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-slate-900 dark:text-white flex items-center gap-2">
-              <CreditCard className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-              {heroCard.currency} Wallet Details
-            </CardTitle>
-            <span className={`text-xs font-semibold px-3 py-1 rounded-full ${
-              heroCard.cardType === 'PLATINUM' ? 'bg-slate-600 text-white' :
-              heroCard.cardType === 'GOLD' ? 'bg-amber-500 text-white' :
-              'bg-gray-900 text-white'
-            }`}>
-              {heroCard.cardType}
-            </span>
-          </div>
-        </CardHeader>
-        <CardContent className="p-6">
-          <div className="grid md:grid-cols-3 gap-6">
-            <div>
-              <p className="text-slate-600 dark:text-slate-400 text-sm mb-1">Available Balance</p>
-              <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                {balanceVisible ? (
-                  heroCard.currency === 'LBP' 
-                    ? `${heroCard.balance.toLocaleString()} ${heroCard.symbol}`
-                    : `${heroCard.symbol}${heroCard.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
-                ) : '•••••••'}
-              </p>
-            </div>
-            <div>
-              <p className="text-slate-600 dark:text-slate-400 text-sm mb-1">Card Number</p>
-              <p className="text-lg font-mono text-slate-900 dark:text-white">
-                •••• •••• •••• {heroCard.cardNumber}
-              </p>
-            </div>
-            <div>
-              <p className="text-slate-600 dark:text-slate-400 text-sm mb-1">Monthly Change</p>
-              <div className={`flex items-center gap-1 ${
-                heroCard.trend === 'up' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'
-              }`}>
-                {heroCard.trend === 'up' ? (
-                  <ArrowUpRight className="h-5 w-5" />
-                ) : (
-                  <ArrowDownRight className="h-5 w-5" />
-                )}
-                <span className="text-xl font-bold">{heroCard.change}</span>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Recent Transactions */}
-      <Card className="bg-white/80 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 backdrop-blur-sm">
-        <CardHeader className="border-b border-slate-200 dark:border-slate-700">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-slate-900 dark:text-white">Recent Transactions</CardTitle>
-            <Link href="/wallet/transactions">
-              <Button variant="ghost" size="sm" className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300">
-                View All
-              </Button>
-            </Link>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="divide-y divide-slate-200 dark:divide-slate-700">
-            {recentTransactions.map((tx) => (
-              <div key={tx.id} className="flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                <div className="flex items-center gap-4">
-                  <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                    tx.type === 'received' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
-                    tx.type === 'sent' ? 'bg-red-500/10 text-red-600 dark:text-red-400' :
-                    'bg-purple-500/10 text-purple-600 dark:text-purple-400'
-                  }`}>
-                    {tx.type === 'received' ? (
-                      <Download className="h-5 w-5" />
-                    ) : tx.type === 'sent' ? (
-                      <Send className="h-5 w-5" />
-                    ) : (
-                      <RefreshCw className="h-5 w-5" />
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-slate-900 dark:text-white">{tx.name}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-500">{tx.time}</p>
-                  </div>
-                </div>
-                <span className={`text-sm font-semibold ${
-                  tx.amount.startsWith('+') ? 'text-emerald-600 dark:text-emerald-400' :
-                  tx.amount.startsWith('-') ? 'text-red-600 dark:text-red-400' :
-                  'text-slate-700 dark:text-slate-300'
+        {/* Current Card Details */}
+        <Card className="bg-white/80 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 backdrop-blur-sm">
+          <CardHeader className="border-b border-slate-200 dark:border-slate-700">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-slate-900 dark:text-white flex items-center gap-2">
+                <CreditCard className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                {heroCard.currency} Wallet Details
+              </CardTitle>
+              <span className={`text-xs font-semibold px-3 py-1 rounded-full ${heroCard.cardType === 'PLATINUM' ? 'bg-slate-600 text-white' :
+                  heroCard.cardType === 'GOLD' ? 'bg-amber-500 text-white' :
+                    'bg-gray-900 text-white'
                 }`}>
-                  {tx.amount}
-                </span>
+                {heroCard.cardType}
+              </span>
+            </div>
+          </CardHeader>
+          <CardContent className="p-6">
+            <div className="grid md:grid-cols-3 gap-6">
+              <div>
+                <p className="text-slate-600 dark:text-slate-400 text-sm mb-1">Available Balance</p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {balanceVisible ? (
+                    heroCard.currency === 'LBP'
+                      ? `${heroCard.balance.toLocaleString()} ${heroCard.symbol}`
+                      : `${heroCard.symbol}${heroCard.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+                  ) : '•••••••'}
+                </p>
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+              <div>
+                <p className="text-slate-600 dark:text-slate-400 text-sm mb-1">Card Number</p>
+                <p className="text-lg font-mono text-slate-900 dark:text-white">
+                  •••• •••• •••• {heroCard.cardNumber}
+                </p>
+              </div>
+              <div>
+                <p className="text-slate-600 dark:text-slate-400 text-sm mb-1">Monthly Change</p>
+                <div className={`flex items-center gap-1 ${heroCard.trend === 'up' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'
+                  }`}>
+                  {heroCard.trend === 'up' ? (
+                    <ArrowUpRight className="h-5 w-5" />
+                  ) : (
+                    <ArrowDownRight className="h-5 w-5" />
+                  )}
+                  <span className="text-xl font-bold">{heroCard.change}</span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Recent Transactions */}
+        <Card className="bg-white/80 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 backdrop-blur-sm">
+          <CardHeader className="border-b border-slate-200 dark:border-slate-700">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-slate-900 dark:text-white">Recent Transactions</CardTitle>
+              <Link href="/wallet/transactions">
+                <Button variant="ghost" size="sm" className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300">
+                  View All
+                </Button>
+              </Link>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y divide-slate-200 dark:divide-slate-700">
+              {isLoadingTransactions ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="p-4 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="h-10 w-10 rounded-full bg-slate-200 dark:bg-slate-700 animate-pulse" />
+                      <div>
+                        <div className="h-4 w-32 bg-slate-200 dark:bg-slate-700 animate-pulse mb-1 rounded" />
+                        <div className="h-3 w-20 bg-slate-200 dark:bg-slate-700 animate-pulse rounded" />
+                      </div>
+                    </div>
+                    <div className="h-4 w-20 bg-slate-200 dark:bg-slate-700 animate-pulse rounded" />
+                  </div>
+                ))
+              ) : transactions.length === 0 ? (
+                <div className="p-8 text-center">
+                  <p className="text-slate-500 dark:text-slate-400">No transactions found</p>
+                </div>
+              ) : (
+                transactions.slice(0, 5).map((tx) => (
+                  <div key={tx.id} className="flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                    <div className="flex items-center gap-4">
+                      <div className={`h-10 w-10 rounded-full flex items-center justify-center ${tx.transaction_type === 'receive' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
+                          tx.transaction_type === 'send' ? 'bg-red-500/10 text-red-600 dark:text-red-400' :
+                            'bg-purple-500/10 text-purple-600 dark:text-purple-400'
+                        }`}>
+                        {tx.transaction_type === 'receive' ? (
+                          <Download className="h-5 w-5" />
+                        ) : tx.transaction_type === 'send' ? (
+                          <Send className="h-5 w-5" />
+                        ) : (
+                          <RefreshCw className="h-5 w-5" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-slate-900 dark:text-white">
+                          {tx.description}
+                        </p>
+                        <p className="text-xs text-slate-500 dark:text-slate-500">
+                          {new Date(tx.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                    </div>
+                    <span className={`text-sm font-semibold ${tx.transaction_type === 'receive' ? 'text-emerald-600 dark:text-emerald-400' :
+                        tx.transaction_type === 'send' ? 'text-red-600 dark:text-red-400' :
+                          'text-slate-700 dark:text-slate-300'
+                      }`}>
+                      {tx.transaction_type === 'receive' ? '+' : tx.transaction_type === 'send' ? '-' : ''}
+                      {tx.currency === 'LBP'
+                        ? `${parseFloat(tx.amount).toLocaleString()} ل.ل`
+                        : `${currencyConfig[tx.currency]?.symbol || '$'}${parseFloat(tx.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+                      }
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </TabsContent>
 
       {/* Analytics Tab */}
       <TabsContent value="analytics" className="space-y-6">
-        <TransactionAnalytics transactions={recentTransactions} />
+        <TransactionAnalytics transactions={transactions} />
       </TabsContent>
     </Tabs>
   );

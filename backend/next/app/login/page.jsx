@@ -3,20 +3,23 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLogin } from '@refinedev/core';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Wallet, Mail, Lock, Loader2, AlertCircle, ShieldX, Phone, XCircle, Ban, AlertTriangle } from 'lucide-react';
+import {
+  Wallet, Mail, Lock, Loader2, AlertCircle, ShieldX,
+  Phone, XCircle, Ban, ArrowRight, CheckCircle2,
+  TrendingUp, Globe, Shield, CreditCard
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
-import Link from 'next/link';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function LoginPage() {
   const router = useRouter();
   const { mutate: login, isLoading: refineIsLoading } = useLogin();
-  
+
   const [mode, setMode] = useState('login'); // 'login' | 'register'
   const [formData, setFormData] = useState({
     email: '',
@@ -32,7 +35,7 @@ export default function LoginPage() {
   const [accountIssue, setAccountIssue] = useState(null); // { type, message, details, code }
   const [isRegistering, setIsRegistering] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false); // Local loading state to override Refine's
-  
+
   // Use local loading state - it's more reliable than Refine's isLoading
   const isLoading = isLoggingIn || refineIsLoading;
 
@@ -42,7 +45,7 @@ export default function LoginPage() {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const message = params.get('message');
-      
+
       if (message === 'account_credited') {
         toast.success('Account Credited!', {
           description: 'Your wallet has been credited by an administrator. Please login to see your updated balance.',
@@ -52,7 +55,7 @@ export default function LoginPage() {
         window.history.replaceState({}, document.title, window.location.pathname);
       }
     }
-    
+
     // Check for suspended message (when redirected from a frozen account)
     const suspendedMessage = sessionStorage.getItem('suspended_message');
     if (suspendedMessage) {
@@ -74,119 +77,69 @@ export default function LoginPage() {
 
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
-    e.stopPropagation(); // Prevent any event bubbling
-    
-    // Prevent form from submitting normally
+    e.stopPropagation();
+
     if (e && typeof e.preventDefault === 'function') {
       e.preventDefault();
     }
-    
+
     setError('');
     setAccountIssue(null);
-    setIsLoggingIn(true); // Set local loading state
+    setIsLoggingIn(true);
 
     if (!formData.email || !formData.password) {
       setError('Please enter both email and password');
-      setIsLoggingIn(false); // Clear loading state
+      setIsLoggingIn(false);
       toast.error('Missing Information', {
         description: 'Please enter both email and password',
         duration: 3000,
       });
-      return false; // Prevent any further execution
+      return false;
     }
 
     // Helper function to handle errors and show notifications
     const handleError = (errorResponse) => {
-      // Handle multiple possible error structures
       const responseData = errorResponse?.response?.data || errorResponse?.data || errorResponse || {};
       const errorCode = responseData.code || errorResponse?.code;
       const errorMessage = responseData.details || responseData.message || errorResponse?.message || errorResponse?.error?.message || '';
       const errorName = errorResponse?.name || responseData?.name || '';
       const statusCode = errorResponse?.response?.status || errorResponse?.status;
-      
-      console.log('[Login Page] Handling error:', { 
-        errorCode, 
-        errorMessage, 
-        errorName, 
-        statusCode,
-        responseData,
-        fullError: errorResponse 
+
+      console.log('[Login Page] Handling error:', {
+        errorCode, errorMessage, errorName, statusCode
       });
-      
-      // Always show toast notification - this ensures user sees feedback
-      // Check for frozen account (multiple ways to detect)
-      if (errorCode === 'ACCOUNT_FROZEN' || errorCode === 'ACCOUNT_SUSPENDED' || 
-          errorName === 'AccountFrozen' || errorName === 'AccountSuspended' ||
-          statusCode === 403) {
+
+      // Handle known error codes
+      if (errorCode === 'ACCOUNT_FROZEN' || errorCode === 'ACCOUNT_SUSPENDED' || statusCode === 403) {
         const message = errorMessage || 'Your account has been frozen. Please contact support for assistance.';
-        console.log('[Login Page] Showing frozen account notification:', message);
         setAccountIssue({
           type: 'frozen',
           message: 'Account Frozen',
           details: message,
           code: errorCode || 'ACCOUNT_FROZEN',
         });
-        // Show toast IMMEDIATELY - no delay to prevent page reload
-        toast.error('Account Frozen', {
-          description: message,
-          duration: 6000,
-        });
-      } else if (errorCode === 'ACCOUNT_DELETED' || errorName === 'AccountDeleted') {
-        const message = errorMessage || 'This account has been deleted. If you believe this is an error, please contact support.';
-        console.log('[Login Page] Showing deleted account notification:', message);
+        toast.error('Account Frozen', { description: message, duration: 6000 });
+      } else if (errorCode === 'ACCOUNT_DELETED') {
         setAccountIssue({
           type: 'deleted',
           message: 'Account Deleted',
-          details: message,
+          details: errorMessage,
           code: 'ACCOUNT_DELETED',
         });
-        // Show toast IMMEDIATELY
-        toast.error('Account Deleted', {
-          description: message,
-          duration: 6000,
-        });
-      } else if (errorCode === 'ACCOUNT_REJECTED' || errorName === 'AccountRejected') {
-        const message = errorMessage || 'Your account has been rejected due to KYC verification failure. Please contact support for assistance.';
-        console.log('[Login Page] Showing rejected account notification:', message);
+        toast.error('Account Deleted', { description: errorMessage, duration: 6000 });
+      } else if (errorCode === 'ACCOUNT_REJECTED') {
+        const message = errorMessage || 'Your account has been rejected due to KYC verification failure.';
         setAccountIssue({
           type: 'rejected',
           message: 'Account Rejected',
           details: message,
           code: 'ACCOUNT_REJECTED',
         });
-        // Show toast IMMEDIATELY
-        toast.error('Account Rejected', {
-          description: message,
-          duration: 6000,
-        });
-      } else if (errorCode === 'INVALID_EMAIL' || errorName === 'InvalidEmail') {
-        const message = errorMessage || 'The email address you entered is not registered.';
-        console.log('[Login Page] Showing invalid email notification:', message);
-        setError(message);
-        // Show toast IMMEDIATELY
-        toast.error('Email Not Found', {
-          description: message,
-          duration: 4000,
-        });
-      } else if (errorCode === 'INVALID_PASSWORD' || errorName === 'InvalidPassword') {
-        const message = errorMessage || 'The password you entered is incorrect.';
-        console.log('[Login Page] Showing invalid password notification:', message);
-        setError(message);
-        // Show toast IMMEDIATELY
-        toast.error('Incorrect Password', {
-          description: message,
-          duration: 4000,
-        });
+        toast.error('Account Rejected', { description: message, duration: 6000 });
       } else {
-        // Generic error fallback - always show notification
         const message = errorMessage || 'Invalid credentials. Please check your email and password.';
-        console.log('[Login Page] Showing generic error notification:', message);
         setError(message);
-        // Show toast IMMEDIATELY
-        toast.error('Login Failed', {
-          description: message,
-          duration: 4000,
-        });
+        toast.error('Login Failed', { description: message, duration: 4000 });
       }
     };
 
@@ -197,78 +150,28 @@ export default function LoginPage() {
       },
       {
         onSuccess: (data) => {
-          setIsLoggingIn(false); // Clear loading state immediately
+          setIsLoggingIn(false);
           toast.success('Login successful!', {
             description: 'Welcome back! Redirecting to your dashboard...',
             duration: 3000,
           });
-          
-          // Get role from fresh login response
+
           const role = data?.user?.role;
-          
-          // Use window.location for FASTER redirect (bypasses RSC fetch issues)
-          // Small delay ensures localStorage is written
           setTimeout(() => {
-          if (role === 'admin') {
+            if (role === 'admin') {
               window.location.href = '/admin/dashboard';
-          } else {
+            } else {
               window.location.href = '/wallet/dashboard';
-          }
+            }
           }, 100);
         },
         onError: (err) => {
-          // CRITICAL: Clear loading state IMMEDIATELY
           setIsLoggingIn(false);
-          
-          console.log('[Login Page] Error received from Refine:', err);
-          console.log('[Login Page] Error structure:', JSON.stringify(err, null, 2));
-          console.log('[Login Page] Error type:', typeof err);
-          console.log('[Login Page] Error keys:', Object.keys(err || {}));
-          
-          // CRITICAL: Prevent any page reload or navigation
-          // Show notification IMMEDIATELY before any async operations
-          
-          // Handle different error object structures (Refine might wrap it)
-          // The error could be:
-          // 1. Direct error object from auth provider
-          // 2. Wrapped in err.error
-          // 3. In err.response.data
-          // 4. Direct properties on err
-          
-          let errorToHandle = null;
-          
-          // Try to extract error from various possible structures
-          if (err?.error) {
-            errorToHandle = err.error;
-            console.log('[Login Page] Found error in err.error:', errorToHandle);
-          } else if (err?.response?.data) {
-            errorToHandle = err.response.data;
-            console.log('[Login Page] Found error in err.response.data:', errorToHandle);
-          } else if (err?.code || err?.name || err?.message) {
-            errorToHandle = err;
-            console.log('[Login Page] Using err directly:', errorToHandle);
-          } else {
-            // Last resort: check if err itself has the structure
-            errorToHandle = err;
-            console.log('[Login Page] Using err as-is (fallback):', errorToHandle);
-          }
-          
-          // Now handle the error
-          if (errorToHandle) {
-            console.log('[Login Page] Handling error:', errorToHandle);
-            handleError(errorToHandle);
-          } else {
-            // Fallback: Show generic error notification immediately
-            console.warn('[Login Page] Unexpected error structure, showing generic notification');
-            const genericMessage = err?.message || 'Login failed. Please check your credentials and try again.';
-            setError(genericMessage);
-            toast.error('Login Failed', {
-              description: genericMessage,
-              duration: 5000,
-            });
-          }
-          
-          // Prevent any navigation - return false explicitly
+
+          // Error parsing logic
+          let errorToHandle = err?.error || err?.response?.data || err;
+          handleError(errorToHandle);
+
           return false;
         },
       }
@@ -300,23 +203,21 @@ export default function LoginPage() {
 
       toast.success('Account created! Signing you in...');
 
-      // Auto-login using Refine auth
+      // Auto-login
       login(
         { email: registerData.email, password: registerData.password },
         {
           onSuccess: (loginData) => {
             const role = loginData?.user?.role || data?.user?.role || 'user';
-            // Use window.location for FASTER redirect (bypasses RSC issues)
             setTimeout(() => {
-            if (role === 'admin') {
+              if (role === 'admin') {
                 window.location.href = '/admin/dashboard';
-            } else {
+              } else {
                 window.location.href = '/wallet/dashboard';
-            }
+              }
             }, 100);
           },
           onError: () => {
-            // If auto-login fails, fallback to login page with prefilled email
             setMode('login');
             setFormData({
               email: registerData.email,
@@ -326,10 +227,7 @@ export default function LoginPage() {
         }
       );
     } catch (err) {
-      const message =
-        err?.response?.data?.message ||
-        err?.response?.data?.error ||
-        'Failed to create account';
+      const message = err?.response?.data?.message || err?.response?.data?.error || 'Failed to create account';
       setError(message);
       toast.error(message);
     } finally {
@@ -337,338 +235,290 @@ export default function LoginPage() {
     }
   };
 
+  // Animation variants
+  const fadeIn = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } }
+  };
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+        delayChildren: 0.2
+      }
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
-      {/* Background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 via-gray-950 to-purple-500/5" />
-      
-      <Card className="w-full max-w-md bg-gray-900 border-gray-800 relative z-10">
-        <CardHeader className="text-center pb-2">
-          {/* Logo */}
-          <div className="flex justify-center mb-4">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 shadow-lg shadow-amber-500/25">
-              <Wallet className="h-8 w-8 text-gray-900" />
+    <div className="min-h-screen w-full bg-[#0a0f1c] flex relative overflow-hidden">
+      {/* Abstract Background Effects */}
+      <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-amber-500/10 blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-purple-500/10 blur-[100px] pointer-events-none" />
+
+      {/* Left Panel - Feature Showcase (Desktop only) */}
+      <div className="hidden lg:flex w-1/2 relative z-10 flex-col items-center justify-center p-12 overflow-hidden border-r border-white/5 bg-white/1 backdrop-blur-sm">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.8 }}
+          className="relative w-full max-w-lg aspect-square"
+        >
+          {/* Animated decorative circles */}
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 40, repeat: Infinity, ease: "linear" }}
+            className="absolute inset-0 rounded-full border border-dashed border-white/10"
+          />
+          <motion.div
+            animate={{ rotate: -360 }}
+            transition={{ duration: 50, repeat: Infinity, ease: "linear" }}
+            className="absolute inset-[15%] rounded-full border border-white/5"
+          />
+
+          {/* Central Content */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+            <div className="h-24 w-24 bg-gradient-to-br from-amber-400 to-orange-600 rounded-3xl flex items-center justify-center shadow-2xl shadow-amber-500/20 mb-8 transform rotate-6 hover:rotate-0 transition-all duration-300">
+              <Wallet className="h-12 w-12 text-white" />
+            </div>
+
+            <h1 className="text-5xl font-bold text-white mb-4 tracking-tight">
+              FX Wallet
+            </h1>
+            <p className="text-lg text-gray-400 max-w-sm leading-relaxed">
+              Global transactions, instant transfers, and professional account management in one secure platform.
+            </p>
+
+            {/* Feature Pills */}
+            <div className="grid grid-cols-2 gap-4 mt-12 w-full max-w-md">
+              {[
+                { icon: Globe, label: 'Global Access' },
+                { icon: Shield, label: 'Bank-Grade Security' },
+                { icon: TrendingUp, label: 'Real-time Analytics' },
+                { icon: CreditCard, label: 'Instant Cards' }
+              ].map((feature, i) => (
+                <div key={i} className="flex items-center gap-3 p-4 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm hover:bg-white/10 transition-colors">
+                  <feature.icon className="h-5 w-5 text-amber-400" />
+                  <span className="text-sm font-medium text-gray-300">{feature.label}</span>
+                </div>
+              ))}
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold text-white">
-            {mode === 'login' ? 'Welcome back' : 'Create an account'}
-          </CardTitle>
-          <CardDescription className="text-gray-400">
-            {mode === 'login'
-              ? 'Sign in to your FXWallet account'
-              : 'Register to start using FXWallet'}
-          </CardDescription>
+        </motion.div>
+      </div>
 
-          {/* Mode toggle */}
-          <div className="mt-4 flex justify-center gap-2 text-xs">
-            <button
-              type="button"
-              onClick={() => {
-                setMode('login');
-                setError('');
-                setAccountIssue(null);
-              }}
-              className={`px-3 py-1 rounded-full border text-xs ${
-                mode === 'login'
-                  ? 'border-amber-500 bg-amber-500/10 text-amber-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-300'
-              }`}
-            >
-              Sign in
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMode('register');
-                setError('');
-                setAccountIssue(null);
-              }}
-              className={`px-3 py-1 rounded-full border text-xs ${
-                mode === 'register'
-                  ? 'border-amber-500 bg-amber-500/10 text-amber-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-300'
-              }`}
-            >
-              Register
-            </button>
-          </div>
-        </CardHeader>
-        
-        <CardContent className="pt-4">
-          {/* Account Issue Notification - Professional Display */}
-          {accountIssue && (
-            <div className={`mb-4 p-4 rounded-xl border ${
-              accountIssue.type === 'frozen' 
-                ? 'bg-gradient-to-br from-red-950/50 to-red-900/30 border-red-500/30'
-                : accountIssue.type === 'rejected'
-                ? 'bg-gradient-to-br from-orange-950/50 to-orange-900/30 border-orange-500/30'
-                : accountIssue.type === 'deleted'
-                ? 'bg-gradient-to-br from-gray-950/50 to-gray-900/30 border-gray-500/30'
-                : 'bg-gradient-to-br from-red-950/50 to-red-900/30 border-red-500/30'
-            }`}>
-              <div className="flex items-start gap-3">
-                <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full ${
-                  accountIssue.type === 'frozen'
-                    ? 'bg-red-500/20'
-                    : accountIssue.type === 'rejected'
-                    ? 'bg-orange-500/20'
-                    : accountIssue.type === 'deleted'
-                    ? 'bg-gray-500/20'
-                    : 'bg-red-500/20'
-                }`}>
-                  {accountIssue.type === 'frozen' ? (
-                    <Ban className="h-5 w-5 text-red-400" />
-                  ) : accountIssue.type === 'rejected' ? (
-                    <XCircle className="h-5 w-5 text-orange-400" />
-                  ) : accountIssue.type === 'deleted' ? (
-                    <AlertCircle className="h-5 w-5 text-gray-400" />
-                  ) : (
-                    <ShieldX className="h-5 w-5 text-red-400" />
-                  )}
-                </div>
-                <div className="flex-1">
-                  <h3 className={`font-semibold text-sm ${
-                    accountIssue.type === 'frozen'
-                      ? 'text-red-400'
-                      : accountIssue.type === 'rejected'
-                      ? 'text-orange-400'
-                      : accountIssue.type === 'deleted'
-                      ? 'text-gray-400'
-                      : 'text-red-400'
-                  }`}>
-                    {accountIssue.message}
-                  </h3>
-                  <p className={`mt-1 text-xs ${
-                    accountIssue.type === 'frozen'
-                      ? 'text-red-300/80'
-                      : accountIssue.type === 'rejected'
-                      ? 'text-orange-300/80'
-                      : accountIssue.type === 'deleted'
-                      ? 'text-gray-300/80'
-                      : 'text-red-300/80'
-                  }`}>
-                    {accountIssue.details}
-                  </p>
-                  {(accountIssue.type === 'frozen' || accountIssue.type === 'rejected' || accountIssue.type === 'deleted') && (
-                    <div className="mt-3 space-y-2">
-                      <div className="flex items-center gap-2 text-xs text-gray-400">
-                        <Phone className="h-3 w-3" />
-                        <span>Contact support: <a href="mailto:support@fxwallet.com" className="text-amber-400 hover:underline">support@fxwallet.com</a></span>
-                      </div>
-                      <Button
-                        type="button"
-                        size="sm"
-                        className="w-full mt-2 bg-amber-500 hover:bg-amber-600 text-gray-900 text-xs h-8"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          console.log('[Login Page] Navigating to support page');
-                          try {
-                            router.push('/wallet/support');
-                          } catch (error) {
-                            console.error('[Login Page] Navigation error, using window.location:', error);
-                            // Fallback to window.location if router fails
-                            window.location.href = '/wallet/support';
-                          }
-                        }}
-                        disabled={false}
-                      >
-                        <Mail className="h-3 w-3 mr-2" />
-                        Submit Support Request
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setAccountIssue(null)}
-                className="mt-3 w-full text-xs text-gray-500 hover:text-gray-400 transition-colors"
-              >
-                Try another account
-              </button>
+      {/* Right Panel - Auth Form */}
+      <div className="flex-1 flex flex-col items-center justify-center p-6 md:p-12 relative z-20">
+        <motion.div
+          initial="hidden"
+          animate="visible"
+          variants={containerVariants}
+          className="w-full max-w-md space-y-8"
+        >
+          {/* Mobile Logo (visible only on small screens) */}
+          <div className="lg:hidden text-center mb-8">
+            <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 shadow-lg shadow-amber-500/25 mb-4">
+              <Wallet className="h-8 w-8 text-white" />
             </div>
-          )}
+            <h2 className="text-2xl font-bold text-white">FX Wallet</h2>
+          </div>
 
-          {mode === 'login' ? (
-            <form onSubmit={handleLoginSubmit} className="space-y-4" noValidate>
-              {/* Error message */}
-              {error && !accountIssue && (
-                <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
-                  <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                  {error}
-                </div>
-              )}
+          <motion.div variants={fadeIn} className="text-center lg:text-left space-y-2">
+            <h2 className="text-3xl font-bold text-white tracking-tight">
+              {mode === 'login' ? 'Welcome back' : 'Create an account'}
+            </h2>
+            <p className="text-gray-400">
+              {mode === 'login'
+                ? 'Enter your credentials to access your dashboard'
+                : 'Fill in your details to get started with FX Wallet'}
+            </p>
+          </motion.div>
 
-              {/* Email */}
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-gray-300">Email</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="admin@admin.com"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="pl-10 bg-gray-800 border-gray-700 text-white placeholder-gray-500 focus:ring-amber-500 focus:border-amber-500"
-                  />
-                </div>
-              </div>
-
-              {/* Password */}
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-gray-300">Password</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="pl-10 bg-gray-800 border-gray-700 text-white placeholder-gray-500 focus:ring-amber-500 focus:border-amber-500"
-                  />
-                </div>
-              </div>
-
-              {/* Submit button */}
-              <Button
-                type="submit"
-                disabled={isLoading}
-                className="w-full bg-amber-500 hover:bg-amber-600 text-gray-900 font-semibold h-11"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Signing in...
-                  </>
-                ) : (
-                  'Sign in'
-                )}
-              </Button>
-
-              {/* Test Notification Button (for debugging) */}
-              <div className="pt-2 pb-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    console.log('[Test] Showing test notification');
-                    toast.error('Test Notification', {
-                      description: 'If you see this, notifications are working!',
-                      duration: 3000,
-                    });
-                  }}
-                  className="w-full text-xs text-gray-500 hover:text-gray-400 underline"
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={mode}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3 }}
+              className="bg-gray-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-6 md:p-8 shadow-2xl"
+            >
+              {/* Account Issues Display */}
+              {accountIssue && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className={`mb-6 p-4 rounded-xl border flex gap-3 ${accountIssue.type === 'frozen' ? 'bg-red-500/10 border-red-500/20' :
+                      accountIssue.type === 'rejected' ? 'bg-orange-500/10 border-orange-500/20' :
+                        'bg-gray-500/10 border-gray-500/20'
+                    }`}
                 >
-                  Test Notification (Click to verify notifications work)
-                </button>
-              </div>
+                  <AlertCircle className={`h-5 w-5 flex-shrink-0 ${accountIssue.type === 'frozen' ? 'text-red-400' : 'text-orange-400'}`} />
+                  <div className="text-sm">
+                    <h4 className={`font-semibold ${accountIssue.type === 'frozen' ? 'text-red-400' : 'text-orange-400'}`}>{accountIssue.message}</h4>
+                    <p className="text-gray-400 mt-1">{accountIssue.details}</p>
+                    <Button variant="link" className="p-0 h-auto mt-2 text-amber-400" onClick={() => window.location.href = '/wallet/support'}>
+                      Contact Support <ArrowRight className="h-3 w-3 ml-1" />
+                    </Button>
+                  </div>
+                </motion.div>
+              )}
 
-              {/* Demo credentials */}
-              <div className="pt-4 border-t border-gray-800">
-                <p className="text-sm text-gray-500 text-center mb-3">Demo credentials:</p>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="p-2 rounded-lg bg-gray-800/50 text-center">
-                    <p className="text-gray-400 mb-1">Admin</p>
-                    <p className="text-gray-300">admin@admin.com</p>
-                    <p className="text-gray-500">admin123</p>
-                  </div>
-                  <div className="p-2 rounded-lg bg-gray-800/50 text-center">
-                    <p className="text-gray-400 mb-1">Customer</p>
-                    <p className="text-gray-300">user@example.com</p>
-                    <p className="text-gray-500">password</p>
-                  </div>
-                </div>
-              </div>
-            </form>
-          ) : (
-            <form onSubmit={handleRegisterSubmit} className="space-y-4">
-              {/* Error message */}
-              {error && (
-                <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
-                  <AlertCircle className="h-4 w-4 flex-shrink-0" />
+              {/* Error Alert */}
+              {error && !accountIssue && (
+                <div className="mb-6 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4" />
                   {error}
                 </div>
               )}
 
-              {/* Full Name */}
-              <div className="space-y-2">
-                <Label htmlFor="fullName" className="text-gray-300">Full name</Label>
-                <Input
-                  id="fullName"
-                  type="text"
-                  placeholder="John Doe"
-                  value={registerData.fullName}
-                  onChange={(e) => setRegisterData({ ...registerData, fullName: e.target.value })}
-                  className="bg-gray-800 border-gray-700 text-white placeholder-gray-500 focus:ring-amber-500 focus:border-amber-500"
-                />
+              {mode === 'login' ? (
+                <form onSubmit={handleLoginSubmit} className="space-y-5">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-gray-300">Email Address</Label>
+                    <div className="relative group">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500 group-focus-within:text-amber-500 transition-colors" />
+                      <Input
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        className="pl-11 h-12 bg-gray-950/50 border-gray-800 focus:border-amber-500/50 focus:ring-amber-500/20 text-white"
+                        placeholder="name@example.com"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <Label className="text-sm font-medium text-gray-300">Password</Label>
+                      <button type="button" className="text-xs text-amber-500 hover:text-amber-400">Forgot password?</button>
+                    </div>
+                    <div className="relative group">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500 group-focus-within:text-amber-500 transition-colors" />
+                      <Input
+                        type="password"
+                        value={formData.password}
+                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                        className="pl-11 h-12 bg-gray-950/50 border-gray-800 focus:border-amber-500/50 focus:ring-amber-500/20 text-white"
+                        placeholder="Enter your password"
+                      />
+                    </div>
+                  </div>
+
+                  <Button
+                    type="submit"
+                    className="w-full h-12 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white font-semibold rounded-xl shadow-lg shadow-amber-500/20 transition-all active:scale-[0.98]"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Sign In'}
+                  </Button>
+                </form>
+              ) : (
+                <form onSubmit={handleRegisterSubmit} className="space-y-5">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-gray-300">Full Name</Label>
+                    <Input
+                      value={registerData.fullName}
+                      onChange={(e) => setRegisterData({ ...registerData, fullName: e.target.value })}
+                      className="h-12 bg-gray-950/50 border-gray-800 focus:border-amber-500/50 focus:ring-amber-500/20 text-white"
+                      placeholder="John Doe"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-gray-300">Email Address</Label>
+                    <Input
+                      type="email"
+                      value={registerData.email}
+                      onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
+                      className="h-12 bg-gray-950/50 border-gray-800 focus:border-amber-500/50 focus:ring-amber-500/20 text-white"
+                      placeholder="name@example.com"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-300">Password</Label>
+                      <Input
+                        type="password"
+                        value={registerData.password}
+                        onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
+                        className="h-12 bg-gray-950/50 border-gray-800 focus:border-amber-500/50 focus:ring-amber-500/20 text-white"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-300">Confirm</Label>
+                      <Input
+                        type="password"
+                        value={registerData.confirmPassword}
+                        onChange={(e) => setRegisterData({ ...registerData, confirmPassword: e.target.value })}
+                        className="h-12 bg-gray-950/50 border-gray-800 focus:border-amber-500/50 focus:ring-amber-500/20 text-white"
+                      />
+                    </div>
+                  </div>
+
+                  <Button
+                    type="submit"
+                    className="w-full h-12 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white font-semibold rounded-xl shadow-lg shadow-amber-500/20 transition-all active:scale-[0.98]"
+                    disabled={isRegistering}
+                  >
+                    {isRegistering ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Create Account'}
+                  </Button>
+                </form>
+              )}
+
+              {/* Mode Toggle */}
+              <div className="mt-8 text-center">
+                <p className="text-sm text-gray-400">
+                  {mode === 'login' ? "Don't have an account? " : "Already have an account? "}
+                  <button
+                    onClick={() => {
+                      setMode(mode === 'login' ? 'register' : 'login');
+                      setError('');
+                      setAccountIssue(null);
+                    }}
+                    className="font-medium text-amber-500 hover:text-amber-400 hover:underline transition-colors"
+                  >
+                    {mode === 'login' ? 'Sign up now' : 'Sign in'}
+                  </button>
+                </p>
               </div>
 
-              {/* Email */}
-              <div className="space-y-2">
-                <Label htmlFor="registerEmail" className="text-gray-300">Email</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
-                  <Input
-                    id="registerEmail"
-                    type="email"
-                    placeholder="you@example.com"
-                    value={registerData.email}
-                    onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
-                    className="pl-10 bg-gray-800 border-gray-700 text-white placeholder-gray-500 focus:ring-amber-500 focus:border-amber-500"
-                  />
-                </div>
-              </div>
+              {/* Quick Demo Credentials for Dev/Demo */}
+              {mode === 'login' && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 1 }}
+                  className="mt-8 pt-6 border-t border-white/5"
+                >
+                  <p className="text-xs text-gray-600 text-center mb-3 uppercased tracking-wider">Demo Access</p>
+                  <div className="flex gap-2 justify-center">
+                    <button
+                      onClick={() => setFormData({ email: 'admin@admin.com', password: 'admin123' })}
+                      className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs text-gray-400 hover:text-white transition-colors border border-white/5"
+                    >
+                      Admin
+                    </button>
+                    <button
+                      onClick={() => setFormData({ email: 'user@example.com', password: 'password' })}
+                      className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs text-gray-400 hover:text-white transition-colors border border-white/5"
+                    >
+                      User
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </motion.div>
+          </AnimatePresence>
 
-              {/* Password */}
-              <div className="space-y-2">
-                <Label htmlFor="registerPassword" className="text-gray-300">Password</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
-                  <Input
-                    id="registerPassword"
-                    type="password"
-                    placeholder="••••••••"
-                    value={registerData.password}
-                    onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
-                    className="pl-10 bg-gray-800 border-gray-700 text-white placeholder-gray-500 focus:ring-amber-500 focus:border-amber-500"
-                  />
-                </div>
-              </div>
-
-              {/* Confirm Password */}
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword" className="text-gray-300">Confirm password</Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  placeholder="••••••••"
-                  value={registerData.confirmPassword}
-                  onChange={(e) => setRegisterData({ ...registerData, confirmPassword: e.target.value })}
-                  className="bg-gray-800 border-gray-700 text-white placeholder-gray-500 focus:ring-amber-500 focus:border-amber-500"
-                />
-              </div>
-
-              {/* Submit button */}
-              <Button
-                type="submit"
-                disabled={isRegistering}
-                className="w-full bg-amber-500 hover:bg-amber-600 text-gray-900 font-semibold h-11"
-              >
-                {isRegistering ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Creating account...
-                  </>
-                ) : (
-                  'Create account'
-                )}
-              </Button>
-            </form>
-          )}
-        </CardContent>
-      </Card>
+          <motion.p variants={fadeIn} className="text-center text-xs text-gray-600">
+            By continuing, you agree to our <a href="#" className="hover:text-gray-400">Terms of Service</a> and <a href="#" className="hover:text-gray-400">Privacy Policy</a>.
+          </motion.p>
+        </motion.div>
+      </div>
     </div>
   );
 }

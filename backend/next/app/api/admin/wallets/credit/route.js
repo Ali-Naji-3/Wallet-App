@@ -74,11 +74,28 @@ export async function POST(req) {
         );
 
         if (wallets.length === 0) {
-          await conn.rollback();
-          return NextResponse.json({ message: 'Wallet not found for this user and currency' }, { status: 400 });
-        }
+          // Wallet doesn't exist? Create one!
+          const address = '0x' + Math.random().toString(16).slice(2) + Math.random().toString(16).slice(2); // Simple random address
 
-        targetWallet = wallets[0];
+          const [result] = await conn.query(
+            `INSERT INTO wallets (user_id, currency_code, balance, status, address, created_at)
+             VALUES (?, ?, 0.00, 'active', ?, NOW())`,
+            [userId, currency, address]
+          );
+
+          targetWallet = {
+            id: result.insertId,
+            user_id: userId,
+            currency_code: currency,
+            balance: 0,
+            address: address
+          };
+
+          // Log creation?
+          console.log(`[CreditFunds] Auto-created ${currency} wallet for user ${userId}`);
+        } else {
+          targetWallet = wallets[0];
+        }
       } else {
         await conn.rollback();
         return NextResponse.json({ message: 'Invalid request: need walletId or (userId + currency)' }, { status: 400 });

@@ -35,6 +35,35 @@ export async function GET(req) {
   }
 }
 
+export async function DELETE(req) {
+  try {
+    await authenticateAdmin(req);
+    const pool = getPool();
+
+    // Attempt to delete all wallets
+    // Note: This might fail if constraints (transactions) exist.
+    // If complex cascading is needed, we'd need to delete transactions first.
+    // We'll let the DB enforce constraints for safety.
+    await pool.query('DELETE FROM wallets');
+
+    return NextResponse.json({ message: 'All wallets deleted successfully' });
+  } catch (error) {
+    console.error('Admin delete all wallets error:', error);
+
+    if (error.code === 'ER_ROW_IS_REFERENCED_2') {
+      return NextResponse.json(
+        { message: 'Cannot delete all wallets: Some have transaction history. Delete transactions first.' },
+        { status: 409 }
+      );
+    }
+
+    return NextResponse.json(
+      { message: error.message || 'Failed to delete wallets' },
+      { status: 500 }
+    );
+  }
+}
+
 
 
 
