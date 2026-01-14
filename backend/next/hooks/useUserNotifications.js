@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import apiClient from '@/lib/api/client';
+import { clearAuthData, getStoredToken } from '@/lib/auth/storage';
 
 /**
  * Custom hook for REGULAR USER real-time notifications using SSE
@@ -69,7 +70,7 @@ export function useUserNotifications(options = {}) {
     
     isConnectingRef.current = true;
     
-    const token = localStorage.getItem('fxwallet_token');
+    const token = getStoredToken();
     if (!token) {
       console.warn('[useUserNotifications] No token found');
       isConnectingRef.current = false;
@@ -122,10 +123,8 @@ export function useUserNotifications(options = {}) {
                   window.alert(adminCreditNotif.title + '\n\n' + adminCreditNotif.body);
                 }
                 
-                // Force logout and redirect to login
-                localStorage.removeItem('fxwallet_token');
-                localStorage.removeItem('fxwallet_user');
-                localStorage.removeItem('user_role');
+                // Force logout and redirect to login (clear ALL auth storage)
+                clearAuthData();
                 
                 setTimeout(() => {
                   window.location.href = '/login?message=account_credited';

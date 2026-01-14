@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useGetIdentity, useLogout, useIsAuthenticated } from '@refinedev/core';
 import { cn } from '@/lib/utils';
-import { clearAuthData } from '@/lib/auth/storage';
+import { clearAuthData, getStoredToken } from '@/lib/auth/storage';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import ThemeToggle from '@/components/ThemeToggle';
@@ -97,9 +97,14 @@ export default function WalletLayout({ children }) {
     
     const checkAccountStatus = async () => {
       try {
+        const token = getStoredToken();
+        if (!token) {
+          return;
+        }
+
         const response = await fetch('/api/auth/me', {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('fxwallet_token')}`,
+            'Authorization': `Bearer ${token}`,
           },
         });
         

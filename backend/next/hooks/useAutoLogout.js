@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import apiClient from '@/lib/api/client';
-import { clearAuthData } from '@/lib/auth/storage';
+import { clearAuthData, getStoredToken } from '@/lib/auth/storage';
 import { toast } from 'sonner';
 
 /**
@@ -23,8 +23,8 @@ export function useAutoLogout() {
       try {
         isCheckingRef.current = true;
         
-        // Check if user is authenticated
-        const token = typeof window !== 'undefined' ? localStorage.getItem('fxwallet_token') : null;
+        // Check if user is authenticated (sessionStorage is source of truth)
+        const token = getStoredToken();
         if (!token) {
           return; // Not logged in, no need to check
         }

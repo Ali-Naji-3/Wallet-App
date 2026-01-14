@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { clearAuthData } from '../auth/storage';
+import { clearAuthData, getStoredToken } from '../auth/storage';
 
 // Use relative URLs for Next.js API routes, or fallback to env variable
 const getBaseURL = () => {
@@ -23,7 +23,7 @@ export const apiClient = axios.create({
 // Request interceptor to add JWT token
 apiClient.interceptors.request.use(
   (config) => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('fxwallet_token') : null;
+    const token = getStoredToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
       // SECURITY: Log token info to help debug user switching issues

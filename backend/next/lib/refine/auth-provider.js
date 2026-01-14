@@ -66,7 +66,8 @@ const fetchAndStoreUser = async () => {
         fetchedUserId: data.user.id,
         fetchedUserEmail: data.user.email,
       });
-      // Clear all auth data to force re-login
+      // SECURITY: Hard fail on identity mismatch.
+      // Clear all auth data to force re-login and DO NOT re-store user/token.
       clearAuthData();
       if (typeof window !== 'undefined') {
         window.location.href = '/login';
@@ -157,12 +158,16 @@ export const authProvider = {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-    try {
-      await fetchAndStoreUser();
+      try {
+        const user = await fetchAndStoreUser();
+        // If mismatch was detected, fetchAndStoreUser returns null after hard-failing.
+        if (!user) {
+          return { authenticated: false, redirectTo: '/login' };
+        }
       } finally {
         clearTimeout(timeoutId);
       }
-      
+
       return { authenticated: true };
     } catch (error) {
       // Don't clear auth on timeout/abort - might just be slow network
