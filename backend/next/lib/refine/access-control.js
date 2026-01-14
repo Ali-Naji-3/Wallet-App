@@ -1,3 +1,5 @@
+import { getStoredToken, getStoredRole } from '../auth/storage';
+
 export const accessControlProvider = {
   can: async ({ resource }) => {
     // Client-side only
@@ -5,12 +7,14 @@ export const accessControlProvider = {
       return { can: false };
     }
 
-    const token = localStorage.getItem('fxwallet_token');
-    const role = localStorage.getItem('user_role') || 'user';
+    // Use session-scoped helpers for per-tab isolation
+    const token = getStoredToken();
+    const role = getStoredRole() || 'user';
 
     if (!token) {
       return { can: false };
     }
+
 
     // Admin-only resources in Refine (admin pages / resources)
     const adminResources = ['users', 'transactions', 'wallets', 'settings', 'kyc', 'audit-logs'];

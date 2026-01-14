@@ -7,13 +7,16 @@
 'use client';
 
 import useSWR from 'swr';
+import { getStoredToken } from '@/lib/auth/storage';
 
 const fetcher = async (url) => {
-  const token = localStorage.getItem('fxwallet_token');
+  const token = getStoredToken();
   const res = await fetch(url, {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
+    headers: token
+      ? {
+          'Authorization': `Bearer ${token}`,
+        }
+      : {},
   });
   if (!res.ok) throw new Error('Failed to fetch');
   return res.json();

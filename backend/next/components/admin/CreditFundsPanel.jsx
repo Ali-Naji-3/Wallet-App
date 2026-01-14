@@ -16,6 +16,7 @@ import {
 import { DollarSign, Search, X, Loader2, AlertCircle, CheckCircle2, Coins } from 'lucide-react';
 import { toast } from 'sonner';
 import apiClient from '@/lib/api/client';
+import { clearAuthData } from '@/lib/auth/storage';
 
 const CURRENCIES = [
   { code: 'USD', name: 'US Dollar', symbol: '$' },
@@ -51,10 +52,9 @@ export default function CreditFundsPanel({
     console.error('[CreditFunds] forceLogout called:', message);
     console.trace('[CreditFunds] forceLogout stack trace');
     toast.error(message, { duration: 6000 });
-    
-    localStorage.removeItem('fxwallet_token');
-    localStorage.removeItem('fxwallet_user');
-    localStorage.removeItem('user_role');
+
+    // Fail-closed: clear all auth data (session + legacy localStorage) before redirect.
+    clearAuthData();
     
     setTimeout(() => {
       console.log('[CreditFunds] Redirecting to /login...');

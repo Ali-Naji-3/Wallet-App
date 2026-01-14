@@ -99,6 +99,7 @@ export default function WalletLayout({ children }) {
       try {
         const token = getStoredToken();
         if (!token) {
+          // No token means unauthenticated; let authProvider handle redirect.
           return;
         }
 

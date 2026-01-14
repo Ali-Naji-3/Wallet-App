@@ -7,6 +7,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { getStoredToken } from '@/lib/auth/storage';
 
 export default function DashboardCSRPage() {
   const [wallets, setWallets] = useState([]);
@@ -14,13 +15,15 @@ export default function DashboardCSRPage() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Fetch data in the browser
-    const token = localStorage.getItem('fxwallet_token');
+    // Fetch data in the browser using the per-tab session token
+    const token = getStoredToken();
     
     fetch('http://localhost:3000/api/wallets/my', {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
+      headers: token
+        ? {
+            'Authorization': `Bearer ${token}`,
+          }
+        : {},
     })
       .then(res => {
         if (!res.ok) throw new Error('Failed to fetch');

@@ -23,6 +23,7 @@ export const apiClient = axios.create({
 // Request interceptor to add JWT token
 apiClient.interceptors.request.use(
   (config) => {
+    // Use session-scoped token to ensure per-tab isolation.
     const token = getStoredToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;

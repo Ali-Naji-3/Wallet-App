@@ -100,6 +100,7 @@ export function useNotifications(options = {}) {
     
     isConnectingRef.current = true;
     
+    // Use session-scoped token so each tab's SSE connection is tied to its own session.
     const token = getStoredToken();
     if (!token) {
       console.warn('[useNotifications] No token found, skipping SSE connection');
@@ -167,7 +168,7 @@ export function useNotifications(options = {}) {
                     window.alert(creditNotif.title + '\n\n' + creditNotif.body);
                   }
                   
-                  // Force logout and redirect to login (clear ALL auth storage)
+                  // Force logout and redirect to login (fail-closed on session change)
                   clearAuthData();
                   
                   setTimeout(() => {

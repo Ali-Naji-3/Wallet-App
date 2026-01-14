@@ -23,7 +23,7 @@ export function useAutoLogout() {
       try {
         isCheckingRef.current = true;
         
-        // Check if user is authenticated (sessionStorage is source of truth)
+        // Check if user is authenticated using per-tab session token
         const token = getStoredToken();
         if (!token) {
           return; // Not logged in, no need to check

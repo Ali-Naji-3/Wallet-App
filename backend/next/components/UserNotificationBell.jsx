@@ -47,10 +47,9 @@ export default function UserNotificationBell() {
     onNewNotification: (notification) => {
       // IMMEDIATE ACTION: If account is suspended, log out immediately
       if (notification.type === 'kyc_rejected' && notification.title?.includes('Account Suspended')) {
-        // Clear auth data immediately
+        // Clear auth data immediately (session + legacy) and fail-closed.
         if (typeof window !== 'undefined') {
-          localStorage.removeItem('fxwallet_token');
-          localStorage.removeItem('fxwallet_user');
+          clearAuthData();
           sessionStorage.setItem('suspended_message', notification.body || 'Your account has been suspended due to KYC rejection.');
           
           // Show suspension message
@@ -123,7 +122,10 @@ export default function UserNotificationBell() {
   const toggleSound = () => {
     const newValue = !soundEnabled;
     setSoundEnabled(newValue);
-    localStorage.setItem('notification_sound', newValue.toString());
+    // Sound preference is not security-sensitive; keep using localStorage.
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('notification_sound', newValue.toString());
+    }
     toast.success(newValue ? 'Sound enabled 🔊' : 'Sound disabled 🔇');
   };
 
