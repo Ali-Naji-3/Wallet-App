@@ -48,6 +48,9 @@ import {
 import { toast } from 'sonner';
 import apiClient from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
+import TransactionDetailsModal from '@/components/transactions/TransactionDetailsModal';
+import TransactionAnalytics from '@/components/transactions/TransactionAnalytics';
+import { exportToPDF, exportToExcel } from '@/lib/services/exportService';
 
 // Transaction categories with icons
 const CATEGORIES = [
@@ -86,6 +89,8 @@ export default function TransactionsPage() {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedTransaction, setSelectedTransaction] = useState(null);
+  const [showAnalytics, setShowAnalytics] = useState(false);
   const itemsPerPage = 20;
 
   // Fetch transactions
@@ -97,15 +102,15 @@ export default function TransactionsPage() {
     try {
       setLoading(true);
       console.log('[Transactions Page] Fetching transactions...');
-      
+
       const { data } = await apiClient.get(ENDPOINTS.TRANSACTIONS.MY);
       console.log('[Transactions Page] API Response:', data);
-      
+
       const transactionsList = data.transactions || data || [];
       console.log('[Transactions Page] Transactions count:', transactionsList.length);
-      
+
       setTransactions(transactionsList);
-      
+
       if (transactionsList.length === 0) {
         console.log('[Transactions Page] No transactions found');
       }
@@ -116,10 +121,10 @@ export default function TransactionsPage() {
         message: error.response?.data?.message,
         data: error.response?.data,
       });
-      
+
       const errorMessage = error.response?.data?.message || 'Failed to load transactions. Please try again.';
       toast.error(errorMessage);
-      
+
       // NO FALLBACK - Show empty state instead
       setTransactions([]);
     } finally {
@@ -131,7 +136,7 @@ export default function TransactionsPage() {
   const applyDateFilter = (txDate) => {
     const date = new Date(txDate);
     const now = new Date();
-    
+
     switch (dateFilter) {
       case 'today':
         return date.toDateString() === now.toDateString();
@@ -158,29 +163,29 @@ export default function TransactionsPage() {
   // Advanced filtering
   const filteredTransactions = transactions.filter(tx => {
     // Search filter
-    const matchesSearch = searchQuery === '' || 
+    const matchesSearch = searchQuery === '' ||
       tx.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       tx.recipient_name?.toLowerCase().includes(searchQuery.toLowerCase());
-    
+
     // Type filter
     const matchesType = typeFilter === 'all' || tx.transaction_type === typeFilter;
-    
+
     // Status filter
     const matchesStatus = statusFilter === 'all' || tx.status === statusFilter;
-    
+
     // Category filter
     const matchesCategory = categoryFilter === 'all' || tx.category === categoryFilter;
-    
+
     // Date filter
     const matchesDate = applyDateFilter(tx.created_at);
-    
+
     // Amount filter
     const txAmount = Math.abs(tx.amount || 0);
     const matchesMinAmount = minAmount === '' || txAmount >= parseFloat(minAmount);
     const matchesMaxAmount = maxAmount === '' || txAmount <= parseFloat(maxAmount);
-    
-    return matchesSearch && matchesType && matchesStatus && matchesCategory && 
-           matchesDate && matchesMinAmount && matchesMaxAmount;
+
+    return matchesSearch && matchesType && matchesStatus && matchesCategory &&
+      matchesDate && matchesMinAmount && matchesMaxAmount;
   });
 
   // Pagination
@@ -202,11 +207,11 @@ export default function TransactionsPage() {
       tx.status,
       tx.category || 'other'
     ]);
-    
+
     const csv = [headers, ...csvData]
       .map(row => row.map(cell => `"${cell}"`).join(','))
       .join('\n');
-    
+
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -218,10 +223,28 @@ export default function TransactionsPage() {
     setExportDialogOpen(false);
   };
 
-  // Export to PDF (simplified - would use a library like jsPDF in production)
-  const exportToPDF = () => {
-    toast.info('PDF export coming soon! Use CSV for now.');
-    setExportDialogOpen(false);
+  // Export handlers
+  const handleExportPDF = () => {
+    try {
+      const dateRange = dateFilter !== 'all' ? `${dateFilter} filter applied` : 'All transactions';
+      exportToPDF(filteredTransactions, { dateRange, includeStats: true });
+      toast.success('PDF exported successfully');
+      setExportDialogOpen(false);
+    } catch (error) {
+      console.error('PDF export error:', error);
+      toast.error('Failed to export PDF');
+    }
+  };
+
+  const handleExportExcel = () => {
+    try {
+      exportToExcel(filteredTransactions, { includeStats: true });
+      toast.success('Excel file exported successfully');
+      setExportDialogOpen(false);
+    } catch (error) {
+      console.error('Excel export error:', error);
+      toast.error('Failed to export Excel');
+    }
   };
 
   // Clear all filters
@@ -313,26 +336,34 @@ export default function TransactionsPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Transactions</h1>
           <p className="text-gray-600 dark:text-slate-400 mt-1">
-            {stats.total} transactions • 
+            {stats.total} transactions •
             <span className="text-emerald-600 dark:text-emerald-400 ml-1">+${stats.totalIncome.toFixed(2)}</span>
             <span className="text-red-600 dark:text-red-400 ml-1">-${stats.totalExpense.toFixed(2)}</span>
           </p>
         </div>
         <div className="flex gap-2">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
             className="border-gray-300 dark:border-slate-700 text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800"
           >
             <Filter className="h-4 w-4 mr-2" />
             Filters
           </Button>
+          <Button
+            variant="outline"
+            onClick={() => setShowAnalytics(!showAnalytics)}
+            className={`border-gray-300 dark:border-slate-700 ${showAnalytics ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' : 'text-gray-700 dark:text-slate-300'} hover:bg-gray-100 dark:hover:bg-slate-800`}
+          >
+            <TrendingUp className="h-4 w-4 mr-2" />
+            Analytics
+          </Button>
           <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
             <DialogTrigger asChild>
               <Button className="bg-amber-500 hover:bg-amber-600 text-gray-900 font-medium">
-          <Download className="h-4 w-4 mr-2" />
-          Export
-        </Button>
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </Button>
             </DialogTrigger>
             <DialogContent className="bg-white dark:bg-slate-900 border-gray-200 dark:border-slate-700">
               <DialogHeader>
@@ -342,25 +373,35 @@ export default function TransactionsPage() {
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 pt-4">
-                <Button 
+                <Button
                   onClick={exportToCSV}
+                  className="w-full justify-start bg-gray-500 hover:bg-gray-600 text-white"
+                >
+                  <FileText className="h-5 w-5 mr-3" />
+                  <div className="text-left">
+                    <div className="font-semibold">Export as CSV</div>
+                    <div className="text-xs opacity-80">Simple spreadsheet format</div>
+                  </div>
+                </Button>
+                <Button
+                  onClick={handleExportExcel}
                   className="w-full justify-start bg-emerald-500 hover:bg-emerald-600 text-white"
                 >
                   <FileSpreadsheet className="h-5 w-5 mr-3" />
                   <div className="text-left">
-                    <div className="font-semibold">Export as CSV</div>
-                    <div className="text-xs opacity-80">Open in Excel, Google Sheets</div>
+                    <div className="font-semibold">Export as Excel</div>
+                    <div className="text-xs opacity-80">Formatted with summary sheet</div>
                   </div>
                 </Button>
-                <Button 
-                  onClick={exportToPDF}
+                <Button
+                  onClick={handleExportPDF}
                   variant="outline"
                   className="w-full justify-start border-gray-300 dark:border-slate-700"
                 >
                   <FileText className="h-5 w-5 mr-3" />
                   <div className="text-left">
                     <div className="font-semibold text-gray-900 dark:text-white">Export as PDF</div>
-                    <div className="text-xs text-gray-600 dark:text-slate-400">Formatted report (Coming soon)</div>
+                    <div className="text-xs text-gray-600 dark:text-slate-400">Professional statement</div>
                   </div>
                 </Button>
               </div>
@@ -388,6 +429,11 @@ export default function TransactionsPage() {
         ))}
       </div>
 
+      {/* Analytics Section */}
+      {showAnalytics && (
+        <TransactionAnalytics transactions={filteredTransactions} />
+      )}
+
       {/* Basic Filters */}
       <Card className="bg-white dark:bg-slate-800/50 border-gray-200 dark:border-slate-700 shadow-xl">
         <CardContent className="p-4">
@@ -402,7 +448,7 @@ export default function TransactionsPage() {
                 className="pl-10 bg-gray-50 dark:bg-slate-900 border-gray-300 dark:border-slate-700 text-gray-900 dark:text-white"
               />
             </div>
-            
+
             {/* Type Filter */}
             <Select value={typeFilter} onValueChange={setTypeFilter}>
               <SelectTrigger className="w-full lg:w-44 bg-gray-50 dark:bg-slate-900">
@@ -543,14 +589,15 @@ export default function TransactionsPage() {
             </div>
           ) : (
             <>
-          <div className="divide-y divide-gray-200 dark:divide-slate-700">
+              <div className="divide-y divide-gray-200 dark:divide-slate-700">
                 {paginatedTransactions.map((tx) => {
                   const CategoryIcon = getCategoryIcon(tx.category);
                   return (
-              <div
-                key={tx.id}
-                      className="flex flex-col sm:flex-row sm:items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-slate-800/30 transition-colors gap-4"
-              >
+                    <div
+                      key={tx.id}
+                      onClick={() => setSelectedTransaction(tx)}
+                      className="flex flex-col sm:flex-row sm:items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-slate-800/30 transition-colors gap-4 cursor-pointer"
+                    >
                       <div className="flex items-center gap-4 flex-1 min-w-0">
                         <div className={`h-12 w-12 rounded-full flex items-center justify-center flex-shrink-0 ${getTypeColor(tx.transaction_type)}`}>
                           {getTypeIcon(tx.transaction_type)}
@@ -566,7 +613,7 @@ export default function TransactionsPage() {
                                 <span>{CATEGORIES.find(c => c.value === tx.category)?.label || tx.category}</span>
                               </div>
                             )}
-                  </div>
+                          </div>
                           <p className="text-sm text-gray-500 dark:text-slate-500">
                             {formatDate(tx.created_at)}
                             {tx.recipient_name && tx.recipient_name !== 'Admin' && (
@@ -575,72 +622,78 @@ export default function TransactionsPage() {
                               </span>
                             )}
                           </p>
-                  </div>
-                </div>
-                
+                        </div>
+                      </div>
+
                       <div className="flex items-center justify-between sm:justify-end gap-4">
-                <div className="text-right">
-                  <p className={`font-bold text-lg ${
-                            tx.transaction_type === 'receive' ? 'text-emerald-600 dark:text-emerald-400' :
+                        <div className="text-right">
+                          <p className={`font-bold text-lg ${tx.transaction_type === 'receive' ? 'text-emerald-600 dark:text-emerald-400' :
                             tx.transaction_type === 'send' ? 'text-red-600 dark:text-red-400' :
-                            'text-amber-600 dark:text-amber-400'
-                  }`}>
+                              'text-amber-600 dark:text-amber-400'
+                            }`}>
                             {formatAmount(tx.amount, tx.currency, tx.transaction_type)}
                           </p>
                         </div>
-                    <Badge
-                      className={
-                        tx.status === 'completed'
-                          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 text-xs font-medium'
+                        <Badge
+                          className={
+                            tx.status === 'completed'
+                              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 text-xs font-medium'
                               : tx.status === 'pending'
-                              ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20 text-xs font-medium'
-                              : 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/20 text-xs font-medium'
-                      }
-                    >
-                      {tx.status}
-                    </Badge>
-                  </div>
-                </div>
+                                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20 text-xs font-medium'
+                                : 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/20 text-xs font-medium'
+                          }
+                        >
+                          {tx.status}
+                        </Badge>
+                      </div>
+                    </div>
                   );
                 })}
-          </div>
+              </div>
 
-          {/* Pagination */}
+              {/* Pagination */}
               <div className="flex flex-col sm:flex-row items-center justify-between p-4 border-t border-gray-200 dark:border-slate-700 gap-4">
-            <p className="text-sm text-gray-600 dark:text-slate-500">
+                <p className="text-sm text-gray-600 dark:text-slate-500">
                   Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredTransactions.length)} of {filteredTransactions.length} transactions
                   {filteredTransactions.length !== transactions.length && (
                     <span className="ml-1 text-amber-600 dark:text-amber-400">(filtered from {transactions.length})</span>
                   )}
-            </p>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                     disabled={currentPage === 1}
                     className="bg-gray-50 dark:bg-slate-900 border-gray-300 dark:border-slate-700"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
                   <span className="text-sm text-gray-700 dark:text-slate-300 px-2">
                     Page {currentPage} of {totalPages || 1}
                   </span>
-              <Button
-                variant="outline"
-                size="sm"
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                     disabled={currentPage === totalPages || totalPages === 0}
                     className="bg-gray-50 dark:bg-slate-900 border-gray-300 dark:border-slate-700"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
             </>
           )}
         </CardContent>
       </Card>
+
+      {/* Transaction Details Modal */}
+      <TransactionDetailsModal
+        transaction={selectedTransaction}
+        open={!!selectedTransaction}
+        onOpenChange={(open) => !open && setSelectedTransaction(null)}
+      />
     </div>
   );
 }
