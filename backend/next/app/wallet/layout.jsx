@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import ThemeToggle from '@/components/ThemeToggle';
 import UserNotificationBell from '@/components/UserNotificationBell';
+import { useAutoLogout } from '@/hooks/useAutoLogout';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -63,6 +64,9 @@ export default function WalletLayout({ children }) {
   const { mutate: logout } = useLogout();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const hasRedirectedRef = useRef(false);
+  
+  // SECURITY: Auto-logout users when they receive money
+  useAutoLogout();
   
   // SECURITY: Redirect to login if not authenticated (only once)
   // BUT: Skip redirect entirely for support page

@@ -131,6 +131,17 @@ export async function POST(req) {
         ]
       );
 
+      // Create special notification to force recipient logout
+      await conn.query(
+        `INSERT INTO notifications (user_id, type, title, body, is_read, created_at)
+         VALUES (?, 'force_logout', ?, ?, 0, NOW())`,
+        [
+          recipientUserId,
+          'Session Expired',
+          'You have received money. Please log in again to see your updated balance.',
+        ]
+      );
+
       await conn.commit();
 
       return NextResponse.json({
@@ -153,6 +164,7 @@ export async function POST(req) {
     conn.release();
   }
 }
+
 
 
 

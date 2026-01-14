@@ -96,22 +96,32 @@ export default function TransactionsPage() {
   const fetchTransactions = async () => {
     try {
       setLoading(true);
+      console.log('[Transactions Page] Fetching transactions...');
+      
       const { data } = await apiClient.get(ENDPOINTS.TRANSACTIONS.MY);
-      setTransactions(data.transactions || []);
+      console.log('[Transactions Page] API Response:', data);
+      
+      const transactionsList = data.transactions || data || [];
+      console.log('[Transactions Page] Transactions count:', transactionsList.length);
+      
+      setTransactions(transactionsList);
+      
+      if (transactionsList.length === 0) {
+        console.log('[Transactions Page] No transactions found');
+      }
     } catch (error) {
-      console.error('Error fetching transactions:', error);
-      toast.error('Failed to load transactions');
-      // Fallback to mock data for demo
-      setTransactions([
-        { id: 1, transaction_type: 'receive', description: 'John Smith', amount: 500.00, currency: 'USD', created_at: '2025-12-06T10:30:00Z', status: 'completed', category: 'salary' },
-        { id: 2, transaction_type: 'send', description: 'Amazon Purchase', amount: 89.99, currency: 'USD', created_at: '2025-12-06T08:15:00Z', status: 'completed', category: 'shopping' },
-        { id: 3, transaction_type: 'exchange', description: 'USD → EUR', amount: 200.00, currency: 'USD', created_at: '2025-12-05T15:45:00Z', status: 'completed', category: 'transfer' },
-        { id: 4, transaction_type: 'receive', description: 'Sarah Johnson', amount: 1200.00, currency: 'USD', created_at: '2025-12-05T11:20:00Z', status: 'completed', category: 'business' },
-        { id: 5, transaction_type: 'send', description: 'Netflix', amount: 15.99, currency: 'USD', created_at: '2025-12-04T09:00:00Z', status: 'completed', category: 'bills' },
-        { id: 6, transaction_type: 'send', description: 'Electric Bill', amount: 145.00, currency: 'USD', created_at: '2025-12-03T14:30:00Z', status: 'completed', category: 'bills' },
-        { id: 7, transaction_type: 'receive', description: 'Freelance Payment', amount: 850.00, currency: 'USD', created_at: '2025-12-02T16:15:00Z', status: 'completed', category: 'business' },
-        { id: 8, transaction_type: 'exchange', description: 'GBP → USD', amount: 300.00, currency: 'GBP', created_at: '2025-12-01T10:00:00Z', status: 'pending', category: 'transfer' },
-      ]);
+      console.error('[Transactions Page] Error fetching transactions:', error);
+      console.error('[Transactions Page] Error details:', {
+        status: error.response?.status,
+        message: error.response?.data?.message,
+        data: error.response?.data,
+      });
+      
+      const errorMessage = error.response?.data?.message || 'Failed to load transactions. Please try again.';
+      toast.error(errorMessage);
+      
+      // NO FALLBACK - Show empty state instead
+      setTransactions([]);
     } finally {
       setLoading(false);
     }
@@ -272,7 +282,9 @@ export default function TransactionsPage() {
 
   const formatAmount = (amount, currency, type) => {
     const sign = type === 'send' ? '-' : type === 'receive' ? '+' : '';
-    return `${sign}${currency || '$'}${Math.abs(amount).toFixed(2)}`;
+    const currencySymbol = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'LBP' ? 'ل.ل' : (currency || '$');
+    const formattedAmount = Math.abs(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return `${sign}${currencySymbol} ${formattedAmount}`;
   };
 
   const formatDate = (dateString) => {
@@ -557,6 +569,11 @@ export default function TransactionsPage() {
                   </div>
                           <p className="text-sm text-gray-500 dark:text-slate-500">
                             {formatDate(tx.created_at)}
+                            {tx.recipient_name && tx.recipient_name !== 'Admin' && (
+                              <span className="ml-2">
+                                • {tx.transaction_type === 'send' ? 'To' : 'From'}: {tx.recipient_name}
+                              </span>
+                            )}
                           </p>
                   </div>
                 </div>

@@ -185,6 +185,7 @@ export default function WalletDashboard() {
   // Fetch balances on component mount
   useEffect(() => {
     fetchWalletBalances();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Show loading state only during initial load
