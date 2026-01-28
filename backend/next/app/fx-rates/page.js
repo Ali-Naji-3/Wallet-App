@@ -6,7 +6,7 @@
 
 import { getPool } from '@/lib/db';
 
-export const revalidate = 60; // Revalidate every 60 seconds
+export const dynamic = 'force-dynamic'; // Revalidate every 60 seconds
 
 export const metadata = {
   title: 'FX Rates',
@@ -15,7 +15,7 @@ export const metadata = {
 
 export default async function FxRatesPage() {
   const pool = getPool();
-  
+
   // Fetch latest rates from database
   const [rates] = await pool.query(
     `SELECT quote_currency, rate, fetched_at
