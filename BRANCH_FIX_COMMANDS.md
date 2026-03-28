@@ -1,205 +1,174 @@
-# 🔧 Branch Fix Commands - Support Feature Restoration
+# 🔧 Branch Fix Commands — f1 & main
 
-## 📋 Problem Analysis
-
-**Current Situation:**
-- You're on branch `r2`
-- Support files exist on disk but are **staged (not committed)** to git
-- Files are NOT in any branch's git history (main, r1, or r2)
-- Status shows files as "A" (Added) but not committed
-- Next.js build can't see them because they're not in git history
-
-**Files Affected:**
-- ✅ `backend/next/app/wallet/support/page.jsx` (exists on disk, staged)
-- ✅ `backend/next/app/api/support/submit/route.js` (exists on disk, staged)
-- ✅ `backend/next/app/admin/support/page.jsx` (exists on disk, staged)
-- ✅ `backend/next/app/api/admin/support/send-verification/route.js` (exists on disk, staged)
-- ✅ `backend/next/app/api/admin/support/save-request/route.js` (exists on disk, staged)
-- ✅ `backend/next/lib/email.js` (exists on disk, staged)
+> **Scope:** All operations are limited to `f1` and `main` branches only.  
+> **Data Safety:** No data, files, or commits will be deleted or altered.
 
 ---
 
-## 🎯 Solution: Commit Files to Current Branch
+## 📋 Current State (Verified)
 
-Since files exist on disk and are staged, we need to:
-1. Commit them to the current branch (r2)
-2. Optionally merge to main if needed
-3. Restart Next.js dev server to recognize the routes
+| Item | Detail |
+|---|---|
+| **Active branch** | `main` |
+| **Branches in scope** | `f1`, `main` |
+| **`f1` ahead of `main` by** | Several commits (features: new UI, card, dash, etc.) |
+| **`main` ahead of `f1` by** | Several commits (support feature, email, security APIs) |
+| **Working tree** | Clean — no uncommitted changes |
+
+### What `f1` has that `main` does NOT:
+- New feature commits (`new`, `new feature`, `f21`, `f1`, `dash`, `card`)
+- These are **already committed** in `f1`
+
+### What `main` has that `f1` does NOT:
+- Support feature (user/admin support pages + APIs)
+- Email configuration & Nodemailer setup
+- KYC email feature
+- Security APIs (change-password, security-logs, etc.)
+- Profile & settings pages updates
 
 ---
 
-## ✅ STEP-BY-STEP FIX COMMANDS
+## 🎯 Goal
 
-### Step 1: Check Current Status
+Bring `main` fully up to date by **merging `f1` features into `main`**, so that `main` contains everything from both branches — without losing any data.
+
+---
+
+## ✅ Step-by-Step Fix
+
+### Step 1 — Verify Starting State
 ```bash
 cd /home/naji/Documents/Wallet-App
+
+# Confirm current branch and clean status
 git status
+git branch
 ```
+**Expected:** `On branch main`, clean working tree.
 
-### Step 2: Commit Support Files to r2 Branch
+---
+
+### Step 2 — Check What f1 Brings In
 ```bash
-# Commit all support-related files
-git add backend/next/app/wallet/support/page.jsx
-git add backend/next/app/api/support/submit/route.js
-git add backend/next/app/admin/support/page.jsx
-git add backend/next/app/api/admin/support/send-verification/route.js
-git add backend/next/app/api/admin/support/save-request/route.js
-git add backend/next/app/api/admin/support/recent-emails/route.js
-git add backend/next/app/api/admin/support/requests/route.js
-git add backend/next/app/api/admin/support/search/route.js
-git add backend/next/lib/email.js
-
-# Commit with descriptive message
-git commit -m "feat: Add support feature - user support page, admin support management, and email notifications"
+# See commits in f1 that are NOT yet in main
+git log main..f1 --oneline
 ```
+This shows exactly what will be merged — review before proceeding.
 
-### Step 3: Verify Files Are Committed
-```bash
-# Check that files are now in git history
-git log --oneline -1
-git ls-tree -r HEAD --name-only | grep support
-```
+---
 
-### Step 4: Merge to Main Branch (Optional but Recommended)
+### Step 3 — Merge f1 into main
 ```bash
-# Switch to main branch
+# Stay on main and merge f1 in
 git checkout main
-
-# Merge r2 into main
-git merge r2 -m "Merge support feature from r2"
-
-# Switch back to r2
-git checkout r2
+git merge f1 -m "merge: Integrate f1 features into main"
 ```
 
-### Step 5: Restart Next.js Dev Server
+> **If a conflict occurs**, Git will pause and list the conflicting files.  
+> See the **Conflict Resolution** section below before continuing.
+
+---
+
+### Step 4 — Verify Merge Success
 ```bash
-# Stop current dev server (Ctrl+C if running)
-# Then restart:
-cd backend/next
+# Confirm both branches now share the same tip
+git log --oneline -8
+
+# Confirm no pending changes
+git status
+
+# Check key files exist from both branches
+git ls-files | grep support | head -10
+git ls-files | grep wallet | head -10
+```
+
+---
+
+### Step 5 — Push Updated main to Remote
+```bash
+git push origin main
+```
+
+---
+
+### Step 6 — Sync f1 with the Updated main (Optional but Clean)
+```bash
+git checkout f1
+git merge main -m "sync: Bring f1 up to date with main"
+git push origin f1
+git checkout main
+```
+This ensures `f1` and `main` are fully in sync going forward.
+
+---
+
+### Step 7 — Restart Dev Server
+```bash
+# Terminal 1 — Next.js frontend
+cd /home/naji/Documents/Wallet-App/backend/next
+npm run dev
+
+# Terminal 2 — Express backend
+cd /home/naji/Documents/Wallet-App/backend
 npm run dev
 ```
 
-### Step 6: Verify Support Page Works
-```bash
-# Test the support page route
-curl http://localhost:4000/wallet/support
+---
 
-# Or open in browser:
-# http://localhost:4000/wallet/support
+## ⚠️ Conflict Resolution
+
+If Step 3 produces conflicts:
+
+```bash
+# See which files have conflicts
+git status
+
+# Open each conflicted file, resolve the <<<<< ===== >>>>> markers manually
+# Then mark as resolved:
+git add <resolved-file>
+
+# Once all conflicts are resolved, complete the merge:
+git commit -m "merge: Integrate f1 features into main (conflicts resolved)"
+```
+
+> **Rule:** Never use `git merge --abort` unless you want to fully cancel — it does NOT lose data, it just cancels the merge attempt.
+
+---
+
+## 🔍 Verification Checklist
+
+Run these after the merge to confirm everything is working:
+
+```bash
+# 1. Git history is clean
+git log --oneline -10
+
+# 2. Both branches point to same or compatible commits
+git log --oneline f1 -3
+git log --oneline main -3
+
+# 3. Support routes accessible
+curl -s -o /dev/null -w "%{http_code}" http://localhost:4000/wallet/support
+curl -s -o /dev/null -w "%{http_code}" http://localhost:4000/admin/support
+
+# 4. Key files present
+ls backend/next/app/wallet/support/page.jsx
+ls backend/next/app/admin/support/page.jsx
+ls backend/next/lib/email.js
 ```
 
 ---
 
-## 🚀 QUICK FIX (All-in-One Commands)
+## 📝 Summary
 
-If you want to do everything at once:
+| Step | Action | Branch |
+|---|---|---|
+| 1 | Verify clean state | `main` |
+| 2 | Inspect f1 commits | — |
+| 3 | Merge `f1` → `main` | `main` |
+| 4 | Verify merge | `main` |
+| 5 | Push to remote | `origin/main` |
+| 6 | Sync `f1` with `main` *(optional)* | `f1` |
+| 7 | Restart dev servers | — |
 
-```bash
-cd /home/naji/Documents/Wallet-App
-
-# Commit all support files
-git add backend/next/app/wallet/support/ \
-        backend/next/app/api/support/ \
-        backend/next/app/admin/support/ \
-        backend/next/app/api/admin/support/ \
-        backend/next/lib/email.js
-
-git commit -m "feat: Add support feature - user support page, admin support management, and email notifications"
-
-# Merge to main
-git checkout main
-git merge r2 -m "Merge support feature from r2"
-git checkout r2
-
-# Restart Next.js (in separate terminal)
-cd backend/next && npm run dev
-```
-
----
-
-## 🔍 VERIFICATION COMMANDS
-
-After running the fix, verify everything works:
-
-```bash
-# 1. Check files are in git
-git ls-tree -r HEAD --name-only | grep -E "(support|email)" | head -10
-
-# 2. Check files exist on disk
-ls -la backend/next/app/wallet/support/page.jsx
-ls -la backend/next/app/api/support/submit/route.js
-ls -la backend/next/app/admin/support/page.jsx
-
-# 3. Check Next.js can see the routes (after restart)
-curl http://localhost:4000/wallet/support 2>&1 | head -5
-
-# 4. Test API endpoint
-curl -X POST http://localhost:4000/api/support/submit \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test@test.com","message":"test"}' 2>&1 | head -10
-```
-
----
-
-## ⚠️ TROUBLESHOOTING
-
-### If you get "files would be overwritten" error:
-```bash
-# Stash current changes first
-git stash
-
-# Then switch branches
-git checkout main
-git merge r2
-git checkout r2
-
-# Restore stashed changes
-git stash pop
-```
-
-### If Next.js still can't see the routes:
-1. **Clear Next.js cache:**
-   ```bash
-   cd backend/next
-   rm -rf .next
-   npm run dev
-   ```
-
-2. **Check Next.js routing:**
-   - Ensure files are in correct location: `app/wallet/support/page.jsx`
-   - Check for any routing middleware that might block it
-
-3. **Verify file permissions:**
-   ```bash
-   ls -la backend/next/app/wallet/support/page.jsx
-   ```
-
-### If files are missing after commit:
-```bash
-# Check if files are tracked
-git ls-files | grep support
-
-# If not tracked, add them:
-git add -f backend/next/app/wallet/support/page.jsx
-git commit -m "Add missing support files"
-```
-
----
-
-## 📝 SUMMARY
-
-**Root Cause:** Support files were created and staged but never committed to git, so they don't exist in any branch's history.
-
-**Solution:** Commit the files to r2 branch, optionally merge to main, and restart Next.js server.
-
-**Expected Result:** 
-- ✅ Files committed to git
-- ✅ Support page accessible at `/wallet/support`
-- ✅ Admin support page accessible at `/admin/support`
-- ✅ API endpoints working (`/api/support/submit`, etc.)
-
----
-
-**Run these commands in order to fix the issue!**
-
+**All data is preserved throughout. No commits, files, or history are removed.**
